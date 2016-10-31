@@ -145,13 +145,14 @@ func (w *watcher) onChange(version string) error {
 	}
 
 	logrus.Debugf("New generated rules: %v", newPortRules)
-	if !reflect.DeepEqual(w.applied, newPortRules) || time.Now().Sub(w.lastApplied) > reapplyEvery {
+	if !reflect.DeepEqual(w.applied, newPortRules) {
 		logrus.Infof("Applying new port rules")
 		return w.apply(newPortRules)
-	} else {
-		logrus.Debugf("No change in applied rules")
+	} else if time.Now().Sub(w.lastApplied) > reapplyEvery {
+		return w.apply(newPortRules)
 	}
 
+	logrus.Debugf("No change in applied rules")
 	return nil
 }
 

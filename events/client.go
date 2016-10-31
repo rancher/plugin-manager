@@ -1,19 +1,19 @@
 package events
 
 import (
-	//"fmt"
-	"github.com/fsouza/go-dockerclient"
 	"os"
 	"path"
+
+	"github.com/fsouza/go-dockerclient"
 )
 
 const (
 	defaultUnixSocket = "unix:///var/run/docker.sock"
-	defaultApiVersion = "1.18"
+	defaultAPIVersion = "1.18"
 )
 
 func NewDockerClient() (*docker.Client, error) {
-	apiVersion := getenv("DOCKER_API_VERSION", defaultApiVersion)
+	apiVersion := getenv("DOCKER_API_VERSION", defaultAPIVersion)
 	endpoint := defaultUnixSocket
 
 	if os.Getenv("CATTLE_DOCKER_USE_BOOT2DOCKER") == "true" {

@@ -3,6 +3,7 @@ package cniconf
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -15,7 +16,7 @@ import (
 
 var (
 	reapplyEvery = 5 * time.Minute
-	confDir      = "/tmp/foo"
+	cniDir       = "/etc/docker/cni/%s.d"
 )
 
 func Watch(c metadata.Client) error {
@@ -62,13 +63,14 @@ func (w *watcher) onChange(version string) error {
 }
 
 func (w *watcher) apply(network string, cniConf map[string]interface{}) error {
-	if err := os.MkdirAll(filepath.Join(confDir, network), 0700); err != nil {
+	confDir := fmt.Sprintf(cniDir, network)
+	if err := os.MkdirAll(confDir, 0700); err != nil {
 		return err
 	}
 
 	var lastErr error
 	for file, config := range cniConf {
-		p := filepath.Join(confDir, network, file)
+		p := filepath.Join(confDir, file)
 		content, err := json.Marshal(config)
 		if err != nil {
 			lastErr = err

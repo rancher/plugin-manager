@@ -1,6 +1,7 @@
 package network
 
 import (
+	"context"
 	"sync"
 
 	"github.com/docker/engine-api/client"
@@ -18,7 +19,7 @@ func newState(c *client.Client) (*state, error) {
 		startTimes: map[string]string{},
 		c:          c,
 	}
-	cs, err := c.ContainerList(types.ContainerListOptions{
+	cs, err := c.ContainerList(context.Background(), types.ContainerListOptions{
 		All: true,
 	})
 	if err != nil {
@@ -26,7 +27,7 @@ func newState(c *client.Client) (*state, error) {
 	}
 
 	for _, container := range cs {
-		inspect, err := c.ContainerInspect(container.ID)
+		inspect, err := c.ContainerInspect(context.Background(), container.ID)
 		if client.IsErrContainerNotFound(err) {
 			continue
 		} else if err != nil {

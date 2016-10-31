@@ -14,8 +14,7 @@ import (
 
 var (
 	reapplyEvery = 5 * time.Minute
-	confDir      = "/tmp/foo"
-	binDir       = "/tmp/foo/bin"
+	binDir       = "/var/lib/cni/bin"
 )
 
 func Watch(c metadata.Client) error {
@@ -91,7 +90,7 @@ func (w *watcher) onChange(version string) error {
 
 func (w *watcher) apply(host metadata.Host, binaries map[string]string) error {
 	if !reflect.DeepEqual(binaries, w.applied) {
-		logrus.Infof("Setting up binaries for: %v")
+		logrus.Infof("Setting up binaries for: %v", binaries)
 	}
 
 	dockerVersion, ok := host.Labels["io.rancher.host.docker_version"]
