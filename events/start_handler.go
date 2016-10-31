@@ -16,7 +16,7 @@ const (
 	RancherSystemLabelKey = "io.rancher.container.system"
 	RancherNameserver     = "169.254.169.250"
 	RancherDomain         = "rancher.internal"
-	RancherDns            = "io.rancher.container.dns"
+	RancherDNS            = "io.rancher.container.dns"
 	CNILabel              = "io.rancher.cni.network"
 )
 
@@ -24,7 +24,7 @@ type StartHandler struct {
 	Client SimpleDockerClient
 }
 
-func getDnsSearch(container *docker.Container) []string {
+func getDNSSearch(container *docker.Container) []string {
 	var defaultDomains []string
 	var svcNameSpace string
 	var stackNameSpace string
@@ -83,7 +83,7 @@ func setupResolvConf(container *docker.Container) error {
 		}
 
 		if strings.HasPrefix(text, "search") {
-			for _, domain := range getDnsSearch(container) {
+			for _, domain := range getDNSSearch(container) {
 				if strings.Contains(text, " "+domain) {
 					continue
 				}
@@ -102,7 +102,7 @@ func setupResolvConf(container *docker.Container) error {
 	}
 
 	if !searchSet {
-		buffer.Write([]byte("search " + strings.ToLower(strings.Join(getDnsSearch(container), " "))))
+		buffer.Write([]byte("search " + strings.ToLower(strings.Join(getDNSSearch(container), " "))))
 		buffer.Write([]byte("\n"))
 	}
 
@@ -135,12 +135,12 @@ func (h *StartHandler) Handle(event *docker.APIEvents) error {
 		return nil
 	}
 
-	log.Infof("Setting up resolv.conf for ContainerId [%s]", event.ID)
-	if c.Config.Labels[RancherDns] == "false" {
+	if c.Config.Labels[RancherDNS] == "false" {
 		return nil
 	}
 
-	if c.Config.Labels[CNILabel] != "" || c.Config.Labels[RancherDns] == "true" {
+	if c.Config.Labels[CNILabel] != "" || c.Config.Labels[RancherDNS] == "true" {
+		log.Infof("Setting up resolv.conf for ContainerId [%s]", event.ID)
 		return setupResolvConf(c)
 	}
 
