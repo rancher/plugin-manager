@@ -55,7 +55,7 @@ func FindSpec(id string) (string, *specs.Spec, error) {
 
 	for _, p := range specPaths {
 		configJSON := fmt.Sprintf(p, id)
-		f, err := os.Open(p)
+		f, err := os.Open(configJSON)
 		if os.IsNotExist(err) {
 			continue
 		}
@@ -78,6 +78,7 @@ func LookupPluginState(container types.ContainerJSON) (*DockerPluginState, error
 	if err != nil {
 		return nil, err
 	}
+	result.ContainerID = container.ID
 	result.Spec = *spec
 	result.HostConfig = *container.HostConfig
 	result.Config = *container.Config
