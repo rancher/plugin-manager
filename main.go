@@ -7,11 +7,11 @@ import (
 	"github.com/docker/engine-api/client"
 	"github.com/rancher/go-rancher-metadata/metadata"
 	"github.com/rancher/plugin-manager/binexec"
-	"github.com/rancher/plugin-manager/events"
-	"github.com/rancher/plugin-manager/network"
-
 	"github.com/rancher/plugin-manager/cniconf"
+	"github.com/rancher/plugin-manager/events"
+	"github.com/rancher/plugin-manager/hostnat"
 	"github.com/rancher/plugin-manager/hostports"
+	"github.com/rancher/plugin-manager/network"
 	"github.com/urfave/cli"
 )
 
@@ -36,23 +36,9 @@ func main() {
 }
 
 func run(c *cli.Context) error {
-	if c.Bool("debug") {
-		logrus.SetLevel(logrus.DebugLevel)
-	}
-
-	mClient := metadata.NewClient(c.String("metadata-url"))
-
-	if err := hostports.Watch(mClient); err != nil {
-		logrus.Errorf("Failed to start host ports configuration: %v", err)
-	}
-
-	if err := cniconf.Watch(mClient); err != nil {
-		logrus.Errorf("Failed to start cni config: %v", err)
-	}
-
-	if err := binexec.Watch(mClient); err != nil {
-		logrus.Errorf("Failed to start bin config: %v", err)
-	}
+	//if c.Bool("debug") {
+	logrus.SetLevel(logrus.DebugLevel)
+	//}
 
 	dClient, err := client.NewEnvClient()
 	if err != nil {
@@ -62,6 +48,24 @@ func run(c *cli.Context) error {
 	manager, err := network.NewManager(dClient)
 	if err != nil {
 		return err
+	}
+
+	mClient := metadata.NewClient(c.String("metadata-url"))
+
+	if err := hostports.Watch(mClient); err != nil {
+		logrus.Errorf("Failed to start host ports configuration: %v", err)
+	}
+
+	if err := hostnat.Watch(mClient); err != nil {
+		logrus.Errorf("Failed to start host nat configuration: %v", err)
+	}
+
+	if err := cniconf.Watch(mClient); err != nil {
+		logrus.Errorf("Failed to start cni config: %v", err)
+	}
+
+	if err := binexec.Watch(mClient); err != nil {
+		logrus.Errorf("Failed to start bin config: %v", err)
 	}
 
 	if err := events.Watch(100, manager); err != nil {

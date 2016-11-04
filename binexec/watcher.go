@@ -22,6 +22,7 @@ func Watch(c metadata.Client) error {
 		c:       c,
 		applied: map[string]string{},
 	}
+	w.onChange("")
 	go c.OnChange(5, w.onChangeNoError)
 	return nil
 }
@@ -67,11 +68,15 @@ func (w *watcher) onChange(version string) error {
 	}
 
 	for _, service := range driverServices {
-		logrus.Debugf("Checking %s %s", service.Kind, service.Name)
-
 		for _, container := range service.Containers {
-			logrus.Debugf("Checking %s %s: %s %s %s", service.Kind, service.Name,
-				container.Name, container.ExternalId, container.HostUUID)
+			logrus.WithFields(logrus.Fields{
+				"serviceKind":         service.Kind,
+				"serviceName":         service.Name,
+				"containerName":       container.Name,
+				"containerExternalId": container.ExternalId,
+				"containerHostUUID":   container.HostUUID,
+				"driverLabel":         hasDriverLabel(container),
+			}).Debugf("Checking for driver binary")
 			if container.ExternalId != "" && container.HostUUID == host.UUID && hasDriverLabel(container) {
 				binName := getBinaryName(container)
 				if binName != "" {
