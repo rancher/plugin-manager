@@ -4,6 +4,7 @@ import (
 	"context"
 	"sync"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/docker/engine-api/client"
 	"github.com/docker/engine-api/types"
 )
@@ -33,8 +34,28 @@ func newState(c *client.Client) (*state, error) {
 		} else if err != nil {
 			return nil, err
 		}
+		logrus.WithFields(logrus.Fields{
+			"cid":       container.ID,
+			"running":   inspect.State.Running,
+			"startedAt": inspect.State.StartedAt,
+		}).Infof("Inspecting on start")
 		if inspect.State.Running {
-			s.startTimes[container.ID] = inspect.State.StartedAt
+			hasIface, err := s.hasNetwork(inspect.State.Pid)
+			if err != nil {
+				logrus.WithField("cid", inspect.ID).Errorf("Failed to inspect interfaces")
+				continue
+			}
+			if hasIface {
+				logrus.WithFields(logrus.Fields{
+					"cid":       container.ID,
+					"startedAt": inspect.State.StartedAt,
+				}).Info("Recording previously started")
+				s.startTimes[container.ID] = inspect.State.StartedAt
+			} else {
+				logrus.WithFields(logrus.Fields{
+					"cid": container.ID,
+				}).Info("Still needs networking")
+			}
 		}
 	}
 

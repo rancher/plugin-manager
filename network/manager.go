@@ -2,6 +2,7 @@ package network
 
 import (
 	"context"
+	"os"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/docker/pkg/locker"
@@ -36,7 +37,6 @@ func NewManager(c *client.Client) (*Manager, error) {
 func (n *Manager) Evaluate(id string) error {
 	n.locks.Lock(id)
 	defer n.locks.Unlock(id)
-	logrus.Debugf("Evaluating networking for: %s", id)
 
 	wasTime := n.s.StartTime(id)
 	wasRunning := wasTime != ""
@@ -57,6 +57,14 @@ func (n *Manager) Evaluate(id string) error {
 		time = inspect.State.StartedAt
 	}
 
+	logrus.WithFields(logrus.Fields{
+		"wasTime":    wasTime,
+		"wasRunning": wasRunning,
+		"running":    running,
+		"time":       time,
+		"cid":        id,
+	}).Debugf("Evaluating networking start")
+
 	if wasRunning {
 		if running && wasTime != time {
 			return n.networkUp(id, inspect)
@@ -71,7 +79,7 @@ func (n *Manager) Evaluate(id string) error {
 }
 
 func (n *Manager) networkUp(id string, inspect types.ContainerJSON) error {
-	logrus.Infof("CNI up: %s, %s", id, inspect.HostConfig.NetworkMode)
+	logrus.WithFields(logrus.Fields{"networkMode": inspect.HostConfig.NetworkMode, "cid": inspect.ID}).Infof("CNI up")
 	pluginState, err := glue.LookupPluginState(inspect)
 	if err != nil {
 		return errors.Wrap(err, "Finding plugin state")
@@ -84,29 +92,24 @@ func (n *Manager) networkUp(id string, inspect types.ContainerJSON) error {
 }
 
 func (n *Manager) networkDown(id string, inspect types.ContainerJSON) error {
+	defer n.s.Stopped(id)
 	if inspect.HostConfig == nil {
 		return nil
 	}
-	logrus.Infof("CNI down: %s, %s", id, inspect.HostConfig.NetworkMode)
+	logrus.WithFields(logrus.Fields{"networkMode": inspect.HostConfig.NetworkMode, "cid": inspect.ID}).Infof("CNI down")
 	pluginState, err := glue.LookupPluginState(inspect)
-	if err != nil {
-		return err
+	if err != nil && !os.IsNotExist(err) {
+		return errors.Wrap(err, "Finding plugin state on down")
 	}
-	if err := glue.Post(pluginState); err != nil {
-		return err
-	}
-	n.s.Stopped(id)
-	return nil
+	return glue.Post(pluginState)
 }
 
 func modifyInspect(inspect *types.ContainerJSON) bool {
 	net, ok := inspect.Config.Labels[cniLabel]
 	if !ok {
-		logrus.Infof("Container %s does not require CNI", inspect.ID)
 		return false
 	}
 
-	logrus.Infof("Container %s is using %s CNI network", inspect.ID, net)
 	inspect.HostConfig.NetworkMode = container.NetworkMode(net)
 	return ok
 }

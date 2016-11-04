@@ -2,6 +2,7 @@ package hostports
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"os/exec"
 	"reflect"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/pkg/errors"
 	"github.com/rancher/go-rancher-metadata/metadata"
 )
 
@@ -21,13 +23,8 @@ func Watch(c metadata.Client) error {
 		c:       c,
 		applied: map[string]PortRule{},
 	}
-	if err := w.insertBaseRules(); err != nil {
-		return err
-	}
 
 	go c.OnChange(5, w.onChangeNoError)
-	go w.watchBaseRules()
-
 	return nil
 }
 
@@ -38,6 +35,7 @@ type watcher struct {
 }
 
 type PortRule struct {
+	Bridge     string
 	SourceIP   string
 	SourcePort string
 	TargetIP   string
@@ -47,7 +45,12 @@ type PortRule struct {
 
 func (p PortRule) prefix() []byte {
 	buf := &bytes.Buffer{}
-	buf.WriteString("-A CATTLE_PREROUTING -p ")
+	buf.WriteString("-A CATTLE_PREROUTING")
+	if p.Bridge != "" {
+		buf.WriteString(" ! -i ")
+		buf.WriteString(p.Bridge)
+	}
+	buf.WriteString(" -p ")
 	buf.WriteString(p.Protocol)
 	if p.SourceIP != "0.0.0.0" {
 		buf.WriteString(" -d ")
@@ -85,15 +88,6 @@ func (w *watcher) insertBaseRules() error {
 	return nil
 }
 
-func (w *watcher) watchBaseRules() {
-	for {
-		time.Sleep(time.Minute)
-		if err := w.insertBaseRules(); err != nil {
-			logrus.Errorf("Failed to install base rules: %v", err)
-		}
-	}
-}
-
 func (w *watcher) run(args ...string) error {
 	logrus.Debugf("Running %s", strings.Join(args, " "))
 	cmd := exec.Command(args[0], args[1:]...)
@@ -128,14 +122,28 @@ func (w *watcher) onChange(version string) error {
 	}
 
 	for _, container := range containers {
+		network := networks[container.NetworkUUID]
+		bridge := ""
+
 		if container.HostUUID != host.UUID ||
-			!networks[container.NetworkUUID].HostPorts ||
+			!network.HostPorts ||
 			container.PrimaryIp == "" {
 			continue
 		}
 
+		conf, _ := network.Metadata["cniConfig"].(map[string]interface{})
+		for _, file := range conf {
+			props, _ := file.(map[string]interface{})
+			cniType, _ := props["type"].(string)
+			checkBridge, _ := props["bridge"].(string)
+
+			if cniType == "rancher-bridge" && checkBridge != "" {
+				bridge = checkBridge
+			}
+		}
+
 		for _, port := range container.Ports {
-			rule, ok := parsePortRule(host.AgentIP, container.PrimaryIp, port)
+			rule, ok := parsePortRule(bridge, host.AgentIP, container.PrimaryIp, port)
 			if !ok {
 				continue
 			}
@@ -158,18 +166,23 @@ func (w *watcher) onChange(version string) error {
 
 func (w *watcher) apply(rules map[string]PortRule) error {
 	buf := &bytes.Buffer{}
-	// NOTE: We don't use CATTLE_PREROUTING, but for migration we just wipe it out
-	buf.WriteString("*nat\n:CATTLE_PREROUTING -\n:CATTLE_POSTROUTING -\n-F CATTLE_PREROUTING\n-F CATTLE_POSTROUTING\n")
-	buf.WriteString(":CATTLE_FORWARD -\n-F CATTLE_FORWARD\n")
-	buf.WriteString("-A CATTLE_FORWARD -m mark --mark 420000 -j ACCEPT\n")
+	// NOTE: We don't use CATTLE_POSTROUTING, but for migration we just wipe it out
+	buf.WriteString("*nat\n:CATTLE_PREROUTING -\n:CATTLE_POSTROUTING -\n")
+	buf.WriteString("-F CATTLE_PREROUTING\n-F CATTLE_POSTROUTING\n")
 	for _, rule := range rules {
 		buf.WriteString("\n")
 		buf.Write(rule.iptables())
 	}
 
+	buf.WriteString("\nCOMMIT\n\n*filter\n:CATTLE_FORWARD -\n")
+	buf.WriteString("-F CATTLE_FORWARD\n")
+	buf.WriteString("-A CATTLE_FORWARD -m mark --mark 420000 -j ACCEPT\n")
+
 	buf.WriteString("\nCOMMIT\n")
 
-	logrus.Debugf("Applying rules\n%s", buf)
+	if logrus.GetLevel() == logrus.DebugLevel {
+		fmt.Printf("Applying rules\n%s", buf)
+	}
 
 	cmd := exec.Command("iptables-restore", "-n")
 	cmd.Stderr = os.Stderr
@@ -179,12 +192,16 @@ func (w *watcher) apply(rules map[string]PortRule) error {
 		return err
 	}
 
+	if err := w.insertBaseRules(); err != nil {
+		return errors.Wrap(err, "Applying port base iptables rules")
+	}
+
 	w.applied = rules
 	w.lastApplied = time.Now()
 	return nil
 }
 
-func parsePortRule(hostIP, targetIP, portDef string) (PortRule, bool) {
+func parsePortRule(bridge, hostIP, targetIP, portDef string) (PortRule, bool) {
 	proto := "tcp"
 	parts := strings.Split(portDef, ":")
 	if len(parts) != 3 {
@@ -193,12 +210,14 @@ func parsePortRule(hostIP, targetIP, portDef string) (PortRule, bool) {
 
 	sourceIP, sourcePort, targetPort := parts[0], parts[1], parts[2]
 
-	parts = strings.Split(parts[2], "/")
+	parts = strings.Split(targetPort, "/")
 	if len(parts) == 2 {
+		targetPort = parts[0]
 		proto = parts[1]
 	}
 
 	return PortRule{
+		Bridge:     bridge,
 		SourceIP:   sourceIP,
 		SourcePort: sourcePort,
 		TargetIP:   targetIP,

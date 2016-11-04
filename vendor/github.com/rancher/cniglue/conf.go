@@ -74,19 +74,22 @@ func FindSpec(id string) (string, *specs.Spec, error) {
 func LookupPluginState(container types.ContainerJSON) (*DockerPluginState, error) {
 	result := &DockerPluginState{}
 
-	bundlePath, spec, err := FindSpec(container.ID)
-	if err != nil {
-		return nil, err
-	}
 	result.ContainerID = container.ID
-	result.Spec = *spec
 	result.HostConfig = *container.HostConfig
 	result.Config = *container.Config
 	result.State = specs.State{
-		BundlePath: bundlePath,
-		ID:         container.ID,
-		Pid:        container.State.Pid,
+		ID:  container.ID,
+		Pid: container.State.Pid,
 	}
+
+	bundlePath, spec, err := FindSpec(container.ID)
+	if err != nil {
+		return result, err
+	}
+
+	result.Spec = *spec
+	result.State.BundlePath = bundlePath
+
 	return result, nil
 }
 
