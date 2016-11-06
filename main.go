@@ -5,6 +5,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/engine-api/client"
+	"github.com/pkg/errors"
 	"github.com/rancher/go-rancher-metadata/metadata"
 	"github.com/rancher/plugin-manager/binexec"
 	"github.com/rancher/plugin-manager/cniconf"
@@ -36,9 +37,15 @@ func main() {
 }
 
 func run(c *cli.Context) error {
-	//if c.Bool("debug") {
-	logrus.SetLevel(logrus.DebugLevel)
-	//}
+	if c.Bool("debug") {
+		logrus.SetLevel(logrus.DebugLevel)
+	}
+
+	logrus.Infof("Waiting for metadata")
+	mClient, err := metadata.NewClientAndWait(c.String("metadata-url"))
+	if err != nil {
+		return errors.Wrap(err, "Creating metadata client")
+	}
 
 	dClient, err := client.NewEnvClient()
 	if err != nil {
@@ -49,8 +56,6 @@ func run(c *cli.Context) error {
 	if err != nil {
 		return err
 	}
-
-	mClient := metadata.NewClient(c.String("metadata-url"))
 
 	if err := hostports.Watch(mClient); err != nil {
 		logrus.Errorf("Failed to start host ports configuration: %v", err)
