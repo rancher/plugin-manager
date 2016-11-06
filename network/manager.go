@@ -3,6 +3,7 @@ package network
 import (
 	"context"
 	"os"
+	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/docker/pkg/locker"
@@ -78,6 +79,12 @@ func (n *Manager) Evaluate(id string) error {
 	return nil
 }
 
+func (n *Manager) retry(id string) {
+	time.Sleep(time.Second)
+	logrus.WithField("cid", id).Infof("Evaluating state from retry")
+	n.Evaluate(id)
+}
+
 func (n *Manager) networkUp(id string, inspect types.ContainerJSON) error {
 	logrus.WithFields(logrus.Fields{"networkMode": inspect.HostConfig.NetworkMode, "cid": inspect.ID}).Infof("CNI up")
 	pluginState, err := glue.LookupPluginState(inspect)
@@ -85,6 +92,7 @@ func (n *Manager) networkUp(id string, inspect types.ContainerJSON) error {
 		return errors.Wrap(err, "Finding plugin state")
 	}
 	if err := glue.Pre(pluginState); err != nil {
+		go n.retry(id)
 		return errors.Wrap(err, "Bringing up networking")
 	}
 	n.s.Started(id, inspect.State.StartedAt)
