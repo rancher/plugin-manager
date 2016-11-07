@@ -79,8 +79,8 @@ func (p PortRule) iptables() []byte {
 }
 
 func (w *watcher) insertBaseRules() error {
-	if w.run("iptables", "-t", "nat", "-C", "PREROUTING", "-j", "CATTLE_PREROUTING") != nil {
-		return w.run("iptables", "-t", "nat", "-I", "PREROUTING", "-j", "CATTLE_PREROUTING")
+	if w.run("iptables", "-t", "nat", "-C", "PREROUTING", "-m", "addrtype", "--dst-type", "LOCAL", "-j", "CATTLE_PREROUTING") != nil {
+		return w.run("iptables", "-t", "nat", "-I", "PREROUTING", "-m", "addrtype", "--dst-type", "LOCAL", "-j", "CATTLE_PREROUTING")
 	}
 	if w.run("iptables", "-C", "FORWARD", "-j", "CATTLE_FORWARD") != nil {
 		return w.run("iptables", "-I", "FORWARD", "-j", "CATTLE_FORWARD")
