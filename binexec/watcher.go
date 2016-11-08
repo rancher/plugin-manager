@@ -136,6 +136,10 @@ exec "${CMD[@]}" %s %s "$@"
 		}
 	}
 
+	if lastErr == nil {
+		w.applied = binaries
+	}
+
 	return lastErr
 }
 

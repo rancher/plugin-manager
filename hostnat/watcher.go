@@ -16,7 +16,7 @@ import (
 
 var (
 	reapplyEvery = 5 * time.Minute
-	natChain     = "CATTLE_NAT_PREROUTING"
+	natChain     = "CATTLE_NAT_POSTROUTING"
 )
 
 func Watch(c metadata.Client) error {
@@ -40,7 +40,11 @@ type MASQRule struct {
 }
 
 func (p MASQRule) iptables() []byte {
-	return []byte(fmt.Sprintf("-A %s -s %s ! -o %s -j MASQUERADE", natChain, p.Subnet, p.Bridge))
+	buf := &bytes.Buffer{}
+	buf.WriteString(fmt.Sprintf("-A %s -p tcp -s %s ! -o %s -j MASQUERADE --to-ports 1024-65535\n", natChain, p.Subnet, p.Bridge))
+	buf.WriteString(fmt.Sprintf("-A %s -p udp -s %s ! -o %s -j MASQUERADE --to-ports 1024-65535\n", natChain, p.Subnet, p.Bridge))
+	buf.WriteString(fmt.Sprintf("-A %s -s %s ! -o %s -j MASQUERADE\n", natChain, p.Subnet, p.Bridge))
+	return buf.Bytes()
 }
 
 func (w *watcher) insertBaseRules() error {
