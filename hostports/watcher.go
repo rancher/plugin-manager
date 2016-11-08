@@ -63,11 +63,13 @@ func (p PortRule) prefix() []byte {
 
 func (p PortRule) iptables() []byte {
 	// Rules like
-	// -A CATTLE_PREROUTING -p ${protocol} --dport ${sourcePort} -j MARK --set-mark 420000
+	// -A CATTLE_PREROUTING -p ${protocol} --dport ${sourcePort} -j MARK --set-mark 4200
 	// -A CATTLE_PREROUTING -p ${protocol} --dport ${sourcePort} -j DNAT --to ${targetIP}:${targetPort}
+	// We use mark 4200.  It is important whatever mark we use that the 0x8000 and 0x4000 bits are unset.
+	// Those bits are used by k8s and will conflict.
 	buf := &bytes.Buffer{}
 	buf.Write(p.prefix())
-	buf.WriteString(" -j MARK --set-mark 420000\n")
+	buf.WriteString(" -j MARK --set-mark 4200\n")
 
 	buf.Write(p.prefix())
 	buf.WriteString(" -j DNAT --to ")
@@ -176,7 +178,7 @@ func (w *watcher) apply(rules map[string]PortRule) error {
 
 	buf.WriteString("\nCOMMIT\n\n*filter\n:CATTLE_FORWARD -\n")
 	buf.WriteString("-F CATTLE_FORWARD\n")
-	buf.WriteString("-A CATTLE_FORWARD -m mark --mark 420000 -j ACCEPT\n")
+	buf.WriteString("-A CATTLE_FORWARD -m mark --mark 4200 -j ACCEPT\n")
 
 	buf.WriteString("\nCOMMIT\n")
 
