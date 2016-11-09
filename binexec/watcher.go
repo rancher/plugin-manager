@@ -14,7 +14,7 @@ import (
 
 var (
 	reapplyEvery = 5 * time.Minute
-	binDir       = "/var/lib/cni/bin"
+	binDir       = "/opt/cni/bin"
 )
 
 func Watch(c metadata.Client) error {
