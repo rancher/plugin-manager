@@ -22,7 +22,7 @@ var (
 func Watch(c metadata.Client) error {
 	w := &watcher{
 		c:       c,
-		applied: map[string]map[string]interface{}{},
+		applied: map[string]metadata.Network{},
 	}
 	go c.OnChange(5, w.onChangeNoError)
 	return nil
@@ -30,7 +30,7 @@ func Watch(c metadata.Client) error {
 
 type watcher struct {
 	c           metadata.Client
-	applied     map[string]map[string]interface{}
+	applied     map[string]metadata.Network
 	lastApplied time.Time
 }
 
@@ -49,21 +49,24 @@ func (w *watcher) onChange(version string) error {
 	forceApply := time.Now().Sub(w.lastApplied) > reapplyEvery
 
 	for _, network := range networks {
-		conf, ok := network.Metadata["cniConfig"].(map[string]interface{})
+		_, ok := network.Metadata["cniConfig"].(map[string]interface{})
 		if !ok {
 			continue
 		}
 
-		if forceApply || !reflect.DeepEqual(w.applied[network.Name], conf) {
-			w.apply(network.Name, conf)
+		if forceApply || !reflect.DeepEqual(w.applied[network.Name], network) {
+			if err := w.apply(network); err != nil {
+				logrus.Errorf("Failed to apply cni conf: %v", err)
+			}
 		}
 	}
 
 	return nil
 }
 
-func (w *watcher) apply(network string, cniConf map[string]interface{}) error {
-	confDir := fmt.Sprintf(cniDir, network)
+func (w *watcher) apply(network metadata.Network) error {
+	cniConf, _ := network.Metadata["cniConfig"].(map[string]interface{})
+	confDir := fmt.Sprintf(cniDir, network.Name)
 	if err := os.MkdirAll(confDir, 0700); err != nil {
 		return err
 	}
@@ -89,8 +92,20 @@ func (w *watcher) apply(network string, cniConf map[string]interface{}) error {
 		}
 	}
 
+	if network.Default {
+		defaultDir := fmt.Sprintf(cniDir, "default")
+		defaultDirTest, err := os.Stat(defaultDir)
+		configDirTest, err1 := os.Stat(confDir)
+		if !(err == nil && err1 == nil && os.SameFile(defaultDirTest, configDirTest)) {
+			os.Remove(defaultDir)
+			if err := os.Symlink(network.Name+".d", defaultDir); err != nil {
+				lastErr = err
+			}
+		}
+	}
+
 	if lastErr == nil {
-		w.applied[network] = cniConf
+		w.applied[network.Name] = network
 		w.lastApplied = time.Now()
 	}
 
