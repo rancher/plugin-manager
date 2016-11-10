@@ -114,6 +114,7 @@ else
 	CMD=(runc)
 fi
 
+PATH=${CNI_PATH}:${PATH}
 
 CMD+=("exec")
 while read LINE; do
@@ -139,6 +140,7 @@ exec "${CMD[@]}" %s %s "$@"
 
 	if lastErr == nil {
 		w.applied = binaries
+		w.lastApplied = time.Now()
 	}
 
 	return lastErr
