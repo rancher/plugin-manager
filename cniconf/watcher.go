@@ -16,7 +16,7 @@ import (
 
 var (
 	reapplyEvery = 5 * time.Minute
-	cniDir       = "/etc/docker/cni/%s.d"
+	cniDir       = "/etc/cni/%s.d"
 )
 
 func Watch(c metadata.Client) error {

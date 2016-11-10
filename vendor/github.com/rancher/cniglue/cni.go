@@ -14,6 +14,7 @@ var (
 	cniDir  = "/etc/docker/cni/%s.d"
 	cniPath = []string{
 		"/var/lib/cni/bin",
+		"/opt/cni/bin",
 		"/usr/local/sbin",
 		"/usr/sbin",
 		"/sbin",
