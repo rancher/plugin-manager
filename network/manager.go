@@ -14,7 +14,10 @@ import (
 	glue "github.com/rancher/cniglue"
 )
 
-var cniLabel = "io.rancher.cni.network"
+var (
+	cniLabel   = "io.rancher.cni.network"
+	maxRetries = 3
+)
 
 type Manager struct {
 	c     *client.Client
@@ -36,6 +39,10 @@ func NewManager(c *client.Client) (*Manager, error) {
 
 // Evaluate checks the state and enableds networking if needed
 func (n *Manager) Evaluate(id string) error {
+	return n.evaluate(id, 0)
+}
+
+func (n *Manager) evaluate(id string, retryCount int) error {
 	n.locks.Lock(id)
 	defer n.locks.Unlock(id)
 
@@ -68,33 +75,38 @@ func (n *Manager) Evaluate(id string) error {
 
 	if wasRunning {
 		if running && wasTime != time {
-			return n.networkUp(id, inspect)
+			return n.networkUp(id, inspect, retryCount)
 		} else if !running {
 			return n.networkDown(id, inspect)
 		}
 	} else if running {
-		return n.networkUp(id, inspect)
+		return n.networkUp(id, inspect, retryCount)
 	}
 
 	return nil
 }
 
-func (n *Manager) retry(id string) {
+func (n *Manager) retry(id string, retryCount int) {
 	time.Sleep(time.Second)
 	logrus.WithField("cid", id).Infof("Evaluating state from retry")
-	n.Evaluate(id)
+	if err := n.evaluate(id, retryCount); err != nil {
+		logrus.Errorf("Failed to evaluate networking: %v", err)
+	}
 }
 
-func (n *Manager) networkUp(id string, inspect types.ContainerJSON) error {
+func (n *Manager) networkUp(id string, inspect types.ContainerJSON, retryCount int) error {
 	logrus.WithFields(logrus.Fields{"networkMode": inspect.HostConfig.NetworkMode, "cid": inspect.ID}).Infof("CNI up")
 	pluginState, err := glue.LookupPluginState(inspect)
 	if err != nil {
 		return errors.Wrap(err, "Finding plugin state")
 	}
 	if err := glue.Pre(pluginState); err != nil {
-		go n.retry(id)
+		if retryCount < maxRetries {
+			go n.retry(id, retryCount+1)
+		}
 		return errors.Wrap(err, "Bringing up networking")
 	}
+	logrus.WithFields(logrus.Fields{"networkMode": inspect.HostConfig.NetworkMode, "cid": inspect.ID}).Infof("CNI up done")
 	n.s.Started(id, inspect.State.StartedAt)
 	return nil
 }

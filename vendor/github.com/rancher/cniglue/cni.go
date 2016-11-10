@@ -11,10 +11,10 @@ import (
 )
 
 var (
-	cniDir  = "/etc/docker/cni/%s.d"
-	cniPath = []string{
-		"/var/lib/cni/bin",
+	CniDir  = "/etc/docker/cni/%s.d"
+	CniPath = []string{
 		"/opt/cni/bin",
+		"/var/lib/cni/bin",
 		"/usr/local/sbin",
 		"/usr/sbin",
 		"/sbin",
@@ -58,8 +58,12 @@ func NewCNIExec(state *DockerPluginState) (*CNIExec, error) {
 			},
 		},
 		cninet: libcni.CNIConfig{
-			Path: cniPath,
+			Path: CniPath,
 		},
+	}
+
+	if uuid, ok := state.Config.Labels["io.rancher.container.uuid"]; ok {
+		c.runtimeConf.Args = append(c.runtimeConf.Args, [2]string{"RancherContainerUUID", uuid})
 	}
 
 	network := state.HostConfig.NetworkMode.NetworkName()
@@ -67,14 +71,14 @@ func NewCNIExec(state *DockerPluginState) (*CNIExec, error) {
 		network = "default"
 	}
 
-	dir := fmt.Sprintf(cniDir, network)
+	dir := fmt.Sprintf(CniDir, network)
 	files, err := libcni.ConfFiles(dir)
 	if err != nil {
 		return nil, err
 	}
 	sort.Strings(files)
 
-	os.Setenv("PATH", strings.Join(cniPath, ":"))
+	os.Setenv("PATH", strings.Join(CniPath, ":"))
 
 	for _, file := range files {
 		netConf, err := libcni.ConfFromFile(file)
