@@ -9,12 +9,13 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/rancher/cniglue"
 	"github.com/rancher/go-rancher-metadata/metadata"
 )
 
 var (
 	reapplyEvery = 5 * time.Minute
-	binDir       = "/opt/cni/bin"
+	binDir       = glue.CniPath[0]
 )
 
 func Watch(c metadata.Client) error {

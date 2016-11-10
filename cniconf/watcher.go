@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/rancher/cniglue"
 	"github.com/rancher/go-rancher-metadata/metadata"
 )
 
@@ -18,6 +19,10 @@ var (
 	reapplyEvery = 5 * time.Minute
 	cniDir       = "/etc/cni/%s.d"
 )
+
+func init() {
+	glue.CniDir = cniDir
+}
 
 func Watch(c metadata.Client) error {
 	w := &watcher{
