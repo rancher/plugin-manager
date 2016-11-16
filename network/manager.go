@@ -100,13 +100,18 @@ func (n *Manager) networkUp(id string, inspect types.ContainerJSON, retryCount i
 	if err != nil {
 		return errors.Wrap(err, "Finding plugin state")
 	}
-	if err := glue.Pre(pluginState); err != nil {
+	result, err := glue.CNIAdd(pluginState)
+	if err != nil {
 		if retryCount < maxRetries {
 			go n.retry(id, retryCount+1)
 		}
 		return errors.Wrap(err, "Bringing up networking")
 	}
-	logrus.WithFields(logrus.Fields{"networkMode": inspect.HostConfig.NetworkMode, "cid": inspect.ID}).Infof("CNI up done")
+	logrus.WithFields(logrus.Fields{
+		"networkMode": inspect.HostConfig.NetworkMode,
+		"cid":         inspect.ID,
+		"result":      result,
+	}).Infof("CNI up done")
 	n.s.Started(id, inspect.State.StartedAt)
 	return nil
 }
@@ -121,7 +126,7 @@ func (n *Manager) networkDown(id string, inspect types.ContainerJSON) error {
 	if err != nil && !os.IsNotExist(err) {
 		return errors.Wrap(err, "Finding plugin state on down")
 	}
-	return glue.Post(pluginState)
+	return glue.CNIDel(pluginState)
 }
 
 func modifyInspect(inspect *types.ContainerJSON) bool {

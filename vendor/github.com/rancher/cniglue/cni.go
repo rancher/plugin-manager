@@ -50,7 +50,7 @@ func NewCNIExec(state *DockerPluginState) (*CNIExec, error) {
 	c := &CNIExec{
 		runtimeConf: libcni.RuntimeConf{
 			ContainerID: state.ContainerID,
-			NetNS:       fmt.Sprintf("/proc/%d/ns/net", state.State.Pid),
+			NetNS:       fmt.Sprintf("/proc/%d/ns/net", state.Pid),
 			IfName:      "eth0",
 			Args: [][2]string{
 				{"IgnoreUnknown", "1"},
