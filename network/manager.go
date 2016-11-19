@@ -16,7 +16,7 @@ import (
 
 var (
 	cniLabel   = "io.rancher.cni.network"
-	maxRetries = 3
+	maxRetries = 60
 )
 
 type Manager struct {
@@ -87,7 +87,7 @@ func (n *Manager) evaluate(id string, retryCount int) error {
 }
 
 func (n *Manager) retry(id string, retryCount int) {
-	time.Sleep(time.Second)
+	time.Sleep(2 * time.Second)
 	logrus.WithField("cid", id).Infof("Evaluating state from retry")
 	if err := n.evaluate(id, retryCount); err != nil {
 		logrus.Errorf("Failed to evaluate networking: %v", err)
