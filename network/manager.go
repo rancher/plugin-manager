@@ -118,7 +118,7 @@ func (n *Manager) networkUp(id string, inspect types.ContainerJSON, retryCount i
 
 func (n *Manager) networkDown(id string, inspect types.ContainerJSON) error {
 	defer n.s.Stopped(id)
-	if inspect.HostConfig == nil {
+	if inspect.ContainerJSONBase == nil || inspect.HostConfig == nil {
 		return nil
 	}
 	logrus.WithFields(logrus.Fields{"networkMode": inspect.HostConfig.NetworkMode, "cid": inspect.ID}).Infof("CNI down")
