@@ -53,6 +53,12 @@ func run(c *cli.Context) error {
 		return err
 	}
 
+	go func() {
+		if err := migrate.Migrate(dClient); err != nil {
+			logrus.Errorf("Failed to migrate old containers")
+		}
+	}()
+
 	manager, err := network.NewManager(dClient)
 	if err != nil {
 		return err
