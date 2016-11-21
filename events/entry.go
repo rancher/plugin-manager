@@ -2,6 +2,7 @@ package events
 
 import (
 	"github.com/fsouza/go-dockerclient"
+	"github.com/rancher/plugin-manager/binexec"
 	"github.com/rancher/plugin-manager/network"
 )
 
@@ -9,10 +10,11 @@ const (
 	simulatedEvent = "-simulated-"
 )
 
-func Watch(poolSize int, nm *network.Manager) error {
+func Watch(poolSize int, nm *network.Manager, bw *binexec.Watcher) error {
 	dep := &DockerEventsProcessor{
 		poolSize: poolSize,
 		nm:       nm,
+		bw:       bw,
 	}
 	return dep.Process()
 }
@@ -20,6 +22,7 @@ func Watch(poolSize int, nm *network.Manager) error {
 type DockerEventsProcessor struct {
 	poolSize int
 	nm       *network.Manager
+	bw       *binexec.Watcher
 }
 
 func (de *DockerEventsProcessor) Process() error {
@@ -31,6 +34,7 @@ func (de *DockerEventsProcessor) Process() error {
 	nmHandler := &NetworkManagerHandler{de.nm}
 	handlers := map[string][]Handler{
 		"start": []Handler{
+			de.bw,
 			&StartHandler{dockerClient},
 			nmHandler,
 		},

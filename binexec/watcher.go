@@ -1,14 +1,18 @@
 package binexec
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
+	"sync"
 	"time"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/docker/engine-api/client"
+	docker "github.com/fsouza/go-dockerclient"
 	"github.com/rancher/cniglue"
 	"github.com/rancher/go-rancher-metadata/metadata"
 )
@@ -18,29 +22,55 @@ var (
 	binDir       = glue.CniPath[0]
 )
 
-func Watch(c metadata.Client) error {
-	w := &watcher{
+func Watch(c metadata.Client, dc *client.Client) *Watcher {
+	w := &Watcher{
 		c:       c,
+		dc:      dc,
 		applied: map[string]string{},
 	}
 	w.onChange("")
 	go c.OnChange(5, w.onChangeNoError)
-	return nil
+	return w
 }
 
-type watcher struct {
+type Watcher struct {
+	sync.Mutex
 	c           metadata.Client
+	dc          *client.Client
 	applied     map[string]string
 	lastApplied time.Time
 }
 
-func (w *watcher) onChangeNoError(version string) {
+func (w *Watcher) onChangeNoError(version string) {
 	if err := w.onChange(version); err != nil {
 		logrus.Errorf("Failed to apply cni conf: %v", err)
 	}
 }
 
-func (w *watcher) onChange(version string) error {
+func (w *Watcher) Handle(event *docker.APIEvents) error {
+	w.Lock()
+
+	changed := false
+	for _, v := range w.applied {
+		if v == event.ID {
+			changed = true
+			break
+		}
+	}
+
+	w.lastApplied = time.Time{}
+	w.Unlock()
+
+	if changed {
+		return w.onChange("")
+	}
+	return nil
+}
+
+func (w *Watcher) onChange(version string) error {
+	w.Lock()
+	defer w.Unlock()
+
 	binaries := map[string]string{}
 	driverServices := map[string]metadata.Service{}
 
@@ -94,46 +124,40 @@ func (w *watcher) onChange(version string) error {
 	return nil
 }
 
-func (w *watcher) apply(host metadata.Host, binaries map[string]string) error {
+func (w *Watcher) apply(host metadata.Host, binaries map[string]string) error {
 	if !reflect.DeepEqual(binaries, w.applied) {
 		logrus.Infof("Setting up binaries for: %v", binaries)
 	}
 
-	dockerVersion, ok := host.Labels["io.rancher.host.docker_version"]
-	if !ok {
-		logrus.Warnf("Failed to determine Docker version")
-		dockerVersion = "unknown"
-	}
-
-	script := `#!/bin/bash
-DOCKER_VERSION="%s"
-
-if [ -e "$(which runc-$DOCKER_VERSION)" ]; then
-	CMD=(runc-${DOCKER_VERSION})
-else
-	CMD=(runc)
-fi
-
-PATH=${CNI_PATH}:${PATH}
-
-CMD+=("exec")
-while read LINE; do
-    CMD+=("-e")
-    CMD+=("$LINE")
-done < <(env)
-
-exec "${CMD[@]}" %s %s "$@"
+	script := `#!/bin/sh
+exec /usr/bin/nsenter -m -u -i -n -p -t %d -- $0 "$@"
 `
 
 	os.MkdirAll(binDir, 0700)
 
 	var lastErr error
 	for name, target := range binaries {
-		p := filepath.Join(binDir, name)
-		content := []byte(fmt.Sprintf(script, dockerVersion, target, name))
-		logrus.Debugf("Writing %s:\n%s", p, content)
-		err := ioutil.WriteFile(p, content, 0700)
+		container, err := w.dc.ContainerInspect(context.Background(), target)
 		if err != nil {
+			lastErr = err
+			break
+		}
+
+		if container.State == nil || container.State.Pid == 0 {
+			lastErr = fmt.Errorf("container is not running")
+			break
+		}
+
+		ptmp := filepath.Join(binDir, name+".tmp")
+		p := filepath.Join(binDir, name)
+		content := []byte(fmt.Sprintf(script, container.State.Pid))
+		logrus.Debugf("Writing %s:\n%s", p, content)
+		if err := ioutil.WriteFile(ptmp, content, 0700); err != nil {
+			lastErr = err
+			break
+		}
+
+		if err := os.Rename(ptmp, p); err != nil {
 			lastErr = err
 		}
 	}

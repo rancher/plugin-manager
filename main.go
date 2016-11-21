@@ -12,6 +12,7 @@ import (
 	"github.com/rancher/plugin-manager/events"
 	"github.com/rancher/plugin-manager/hostnat"
 	"github.com/rancher/plugin-manager/hostports"
+	"github.com/rancher/plugin-manager/migrate"
 	"github.com/rancher/plugin-manager/network"
 	"github.com/urfave/cli"
 )
@@ -69,11 +70,9 @@ func run(c *cli.Context) error {
 		logrus.Errorf("Failed to start cni config: %v", err)
 	}
 
-	if err := binexec.Watch(mClient); err != nil {
-		logrus.Errorf("Failed to start bin config: %v", err)
-	}
+	binWatcher := binexec.Watch(mClient, dClient)
 
-	if err := events.Watch(100, manager); err != nil {
+	if err := events.Watch(100, manager, binWatcher); err != nil {
 		return err
 	}
 
