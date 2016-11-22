@@ -3,20 +3,22 @@ set -e
 
 source $(dirname $0)/version
 
-ARCH=${ARCH:-"amd64"}
+ARCH=${ARCH:?"ARCH not set"}
 SUFFIX=""
 [ "${ARCH}" != "amd64" ] && SUFFIX="_${ARCH}"
 
 cd $(dirname $0)/../package
 
-TAG=${TAG:-${VERSION}${SUFFIX}}
+TAG=${TAG:-${IMAGE_VERSION}${SUFFIX}}
 REPO=${REPO:-rancher}
 
-if echo $TAG | grep -q dirty; then
-    TAG=dev
+if [ ! -e ../bin/storage ]; then
+    ../scripts/build
 fi
 
 cp ../bin/plugin-manager .
-docker build -t ${REPO}/plugin-manager:${TAG} .
 
-echo Built ${REPO}/plugin-manager:${TAG}
+IMAGE=${REPO}/plugin-manager:${TAG}
+docker build -t ${IMAGE} .
+echo ${IMAGE} > ../dist/images
+echo Built ${IMAGE}
