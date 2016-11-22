@@ -12,7 +12,6 @@ import (
 	"github.com/rancher/plugin-manager/events"
 	"github.com/rancher/plugin-manager/hostnat"
 	"github.com/rancher/plugin-manager/hostports"
-	"github.com/rancher/plugin-manager/migrate"
 	"github.com/rancher/plugin-manager/network"
 	"github.com/urfave/cli"
 )
@@ -52,12 +51,6 @@ func run(c *cli.Context) error {
 	if err != nil {
 		return err
 	}
-
-	go func() {
-		if err := migrate.Migrate(dClient); err != nil {
-			logrus.Errorf("Failed to migrate old containers")
-		}
-	}()
 
 	manager, err := network.NewManager(dClient)
 	if err != nil {
