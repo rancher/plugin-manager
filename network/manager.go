@@ -133,7 +133,7 @@ func (n *Manager) networkDown(id string, inspect types.ContainerJSON) error {
 
 func configureNetwork(inspect *types.ContainerJSON) bool {
 	net, ok := inspect.Config.Labels[CNILabel]
-	if !ok || inspect.Config.Labels[LegacyManagedNetLabel] == "true" || inspect.Config.Labels[IPLabel] != "" {
+	if !ok && (inspect.Config.Labels[LegacyManagedNetLabel] == "true" || inspect.Config.Labels[IPLabel] != "") {
 		net = "managed"
 	}
 
