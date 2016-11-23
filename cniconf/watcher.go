@@ -98,12 +98,12 @@ func (w *watcher) apply(network metadata.Network) error {
 	}
 
 	if network.Default {
-		defaultDir := fmt.Sprintf(cniDir, "default")
-		defaultDirTest, err := os.Stat(defaultDir)
+		managedDir := fmt.Sprintf(cniDir, "managed")
+		managedDirTest, err := os.Stat(managedDir)
 		configDirTest, err1 := os.Stat(confDir)
-		if !(err == nil && err1 == nil && os.SameFile(defaultDirTest, configDirTest)) {
-			os.Remove(defaultDir)
-			if err := os.Symlink(network.Name+".d", defaultDir); err != nil {
+		if !(err == nil && err1 == nil && os.SameFile(managedDirTest, configDirTest)) {
+			os.Remove(managedDir)
+			if err := os.Symlink(network.Name+".d", managedDir); err != nil {
 				lastErr = err
 			}
 		}

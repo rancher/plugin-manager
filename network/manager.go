@@ -14,9 +14,11 @@ import (
 	glue "github.com/rancher/cniglue"
 )
 
-var (
-	cniLabel   = "io.rancher.cni.network"
-	maxRetries = 60
+const (
+	maxRetries            = 60
+	IPLabel               = "io.rancher.container.ip"
+	LegacyManagedNetLabel = "io.rancher.container.network"
+	CNILabel              = "io.rancher.cni.network"
 )
 
 type Manager struct {
@@ -58,7 +60,7 @@ func (n *Manager) evaluate(id string, retryCount int) error {
 	} else if err != nil {
 		return err
 	} else {
-		if !modifyInspect(&inspect) {
+		if !configureNetwork(&inspect) {
 			return nil
 		}
 		running = inspect.State.Running
@@ -129,12 +131,16 @@ func (n *Manager) networkDown(id string, inspect types.ContainerJSON) error {
 	return glue.CNIDel(pluginState)
 }
 
-func modifyInspect(inspect *types.ContainerJSON) bool {
-	net, ok := inspect.Config.Labels[cniLabel]
-	if !ok {
+func configureNetwork(inspect *types.ContainerJSON) bool {
+	net, ok := inspect.Config.Labels[CNILabel]
+	if !ok || inspect.Config.Labels[LegacyManagedNetLabel] == "true" || inspect.Config.Labels[IPLabel] != "" {
+		net = "managed"
+	}
+
+	if net == "" {
 		return false
 	}
 
 	inspect.HostConfig.NetworkMode = container.NetworkMode(net)
-	return ok
+	return true
 }
