@@ -127,6 +127,10 @@ func (w *watcher) onChange(version string) error {
 		network := networks[container.NetworkUUID]
 		bridge := ""
 
+		if container.State != "running" {
+			continue
+		}
+
 		if container.HostUUID != host.UUID ||
 			!network.HostPorts ||
 			container.PrimaryIp == "" {
