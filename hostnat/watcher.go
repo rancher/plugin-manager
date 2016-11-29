@@ -19,6 +19,7 @@ var (
 	natChain     = "CATTLE_NAT_POSTROUTING"
 )
 
+// Watch is used to look for changes in metadata and apply hostnat related rules
 func Watch(c metadata.Client) error {
 	w := &watcher{
 		c:       c,
@@ -34,6 +35,8 @@ type watcher struct {
 	lastApplied time.Time
 }
 
+// MASQRule is used to store the needed information for building
+// a masquerading rule
 type MASQRule struct {
 	Subnet string
 	Bridge string
@@ -44,7 +47,19 @@ func (p MASQRule) iptables() []byte {
 	buf.WriteString(fmt.Sprintf("-A %s -p tcp -s %s ! -o %s -j MASQUERADE --to-ports 1024-65535\n", natChain, p.Subnet, p.Bridge))
 	buf.WriteString(fmt.Sprintf("-A %s -p udp -s %s ! -o %s -j MASQUERADE --to-ports 1024-65535\n", natChain, p.Subnet, p.Bridge))
 	buf.WriteString(fmt.Sprintf("-A %s -s %s ! -o %s -j MASQUERADE\n", natChain, p.Subnet, p.Bridge))
+
+	// LOCAL src
+	buf.WriteString(fmt.Sprintf("-A %s -o %s -m addrtype --src-type LOCAL --dst-type UNICAST -j MASQUERADE", natChain, p.Bridge))
 	return buf.Bytes()
+}
+
+func (p MASQRule) localRoutingSetting() string {
+	s := ""
+	if p.Bridge != "" {
+		s = fmt.Sprintf("net.ipv4.conf.%v.route_localnet=1", p.Bridge)
+	}
+
+	return s
 }
 
 func (w *watcher) insertBaseRules() error {
@@ -116,7 +131,27 @@ func (w *watcher) networkToRule(network metadata.Network) *MASQRule {
 	return nil
 }
 
+func (w *watcher) enableLocalNetRouting(rules map[string]MASQRule) error {
+	for _, rule := range rules {
+		s := rule.localRoutingSetting()
+		if s != "" {
+			logrus.Debugf("s: %v", s)
+			err := w.run("sysctl", "-w", s)
+			if err != nil {
+				logrus.Errorf("error enabling local net routing: %v", err)
+				return nil
+			}
+		}
+	}
+
+	return nil
+}
+
 func (w *watcher) apply(rules map[string]MASQRule) error {
+	if err := w.enableLocalNetRouting(rules); err != nil {
+		return err
+	}
+
 	buf := &bytes.Buffer{}
 	buf.WriteString(fmt.Sprintf("*nat\n:%s -\n-F %s\n", natChain, natChain))
 	for _, rule := range rules {
