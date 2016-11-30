@@ -77,7 +77,10 @@ func (p PortRule) iptables() []byte {
 	buf.WriteString(":")
 	buf.WriteString(p.TargetPort)
 
-	buf.WriteString(fmt.Sprintf("\n-A OUTPUT -p %v -m %v --dport %v -j DNAT --to-destination %v:%v",
+	buf.WriteString(fmt.Sprintf("\n-A CATTLE_PREROUTING -p %v -m %v --dport %v -m addrtype --dst-type LOCAL -j DNAT --to-destination %v:%v",
+		p.Protocol, p.Protocol, p.SourcePort, p.TargetIP, p.TargetPort))
+
+	buf.WriteString(fmt.Sprintf("\n-A OUTPUT -p %v -m %v --dport %v -m addrtype --dst-type LOCAL -j DNAT --to-destination %v:%v",
 		p.Protocol, p.Protocol, p.SourcePort, p.TargetIP, p.TargetPort))
 
 	return buf.Bytes()
