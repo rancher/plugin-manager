@@ -58,12 +58,20 @@ func getDNSSearch(container *docker.Container) []string {
 	return defaultDomains
 }
 
+func trimDockerPath(p string) string {
+	i := strings.Index(p, "/var/lib/docker")
+	if i > 0 {
+		return p[i:]
+	}
+	return p
+}
+
 func setupResolvConf(container *docker.Container) error {
 	if _, ok := container.Config.Labels[RancherSystemLabelKey]; ok {
 		return nil
 	}
 
-	p := container.ResolvConfPath
+	p := trimDockerPath(container.ResolvConfPath)
 	input, err := os.Open(p)
 	if err != nil {
 		return err
