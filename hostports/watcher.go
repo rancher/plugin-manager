@@ -18,6 +18,7 @@ var (
 	reapplyEvery = 5 * time.Minute
 )
 
+// Watch is used to monitor metadata for changes
 func Watch(c metadata.Client) error {
 	w := &watcher{
 		c:       c,
@@ -34,6 +35,8 @@ type watcher struct {
 	lastApplied time.Time
 }
 
+// PortRule is used to store the needed information for building a
+// iptables rule
 type PortRule struct {
 	Bridge     string
 	SourceIP   string
@@ -80,7 +83,7 @@ func (p PortRule) iptables() []byte {
 	buf.WriteString(fmt.Sprintf("\n-A CATTLE_PREROUTING -p %v -m %v --dport %v -m addrtype --dst-type LOCAL -j DNAT --to-destination %v:%v",
 		p.Protocol, p.Protocol, p.SourcePort, p.TargetIP, p.TargetPort))
 
-	buf.WriteString(fmt.Sprintf("\n-A OUTPUT -p %v -m %v --dport %v -m addrtype --dst-type LOCAL -j DNAT --to-destination %v:%v",
+	buf.WriteString(fmt.Sprintf("\n-A CATTLE_OUTPUT -p %v -m %v --dport %v -m addrtype --dst-type LOCAL -j DNAT --to-destination %v:%v",
 		p.Protocol, p.Protocol, p.SourcePort, p.TargetIP, p.TargetPort))
 
 	return buf.Bytes()
@@ -92,6 +95,9 @@ func (w *watcher) insertBaseRules() error {
 	}
 	if w.run("iptables", "-C", "FORWARD", "-j", "CATTLE_FORWARD") != nil {
 		return w.run("iptables", "-I", "FORWARD", "-j", "CATTLE_FORWARD")
+	}
+	if w.run("iptables", "-t", "nat", "-C", "OUTPUT", "-m", "addrtype", "--dst-type", "LOCAL", "-j", "CATTLE_OUTPUT") != nil {
+		return w.run("iptables", "-t", "nat", "-I", "OUTPUT", "-m", "addrtype", "--dst-type", "LOCAL", "-j", "CATTLE_OUTPUT")
 	}
 	return nil
 }
@@ -179,8 +185,13 @@ func (w *watcher) onChange(version string) error {
 func (w *watcher) apply(rules map[string]PortRule) error {
 	buf := &bytes.Buffer{}
 	// NOTE: We don't use CATTLE_POSTROUTING, but for migration we just wipe it out
-	buf.WriteString("*nat\n:CATTLE_PREROUTING -\n:CATTLE_POSTROUTING -\n")
-	buf.WriteString("-F CATTLE_PREROUTING\n-F CATTLE_POSTROUTING\n")
+	buf.WriteString("*nat\n")
+	buf.WriteString(":CATTLE_PREROUTING -\n")
+	buf.WriteString(":CATTLE_POSTROUTING -\n")
+	buf.WriteString(":CATTLE_OUTPUT -\n")
+	buf.WriteString("-F CATTLE_PREROUTING\n")
+	buf.WriteString("-F CATTLE_POSTROUTING\n")
+	buf.WriteString("-F CATTLE_OUTPUT\n")
 	for _, rule := range rules {
 		buf.WriteString("\n")
 		buf.Write(rule.iptables())
