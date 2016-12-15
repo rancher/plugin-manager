@@ -63,8 +63,8 @@ func (p MASQRule) localRoutingSetting() string {
 }
 
 func (w *watcher) insertBaseRules() error {
-	if w.run("iptables", "-t", "nat", "-C", "POSTROUTING", "-j", natChain) != nil {
-		return w.run("iptables", "-t", "nat", "-I", "POSTROUTING", "-j", natChain)
+	if w.run("iptables", "-w", "-t", "nat", "-C", "POSTROUTING", "-j", natChain) != nil {
+		return w.run("iptables", "-w", "-t", "nat", "-I", "POSTROUTING", "-j", natChain)
 	}
 	return nil
 }
@@ -170,6 +170,7 @@ func (w *watcher) apply(rules map[string]MASQRule) error {
 	cmd.Stdout = os.Stdout
 	cmd.Stdin = buf
 	if err := cmd.Run(); err != nil {
+		logrus.Errorf("Failed to apply rules\n%s", buf)
 		return err
 	}
 
