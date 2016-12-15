@@ -2,10 +2,14 @@ package network
 
 import (
 	"context"
+	"fmt"
+	"io/ioutil"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/Sirupsen/logrus"
+	cniTypes "github.com/containernetworking/cni/pkg/types"
 	"github.com/docker/docker/pkg/locker"
 	"github.com/docker/engine-api/client"
 	"github.com/docker/engine-api/types"
@@ -114,8 +118,35 @@ func (n *Manager) networkUp(id string, inspect types.ContainerJSON, retryCount i
 		"cid":         inspect.ID,
 		"result":      result,
 	}).Infof("CNI up done")
+	if err := n.setupHosts(inspect, result); err != nil {
+		return err
+	}
 	n.s.Started(id, inspect.State.StartedAt)
 	return nil
+}
+
+func (n *Manager) setupHosts(inspect types.ContainerJSON, result *cniTypes.Result) error {
+	if inspect.Config == nil || inspect.Config.Hostname == "" || inspect.HostsPath == "" ||
+		result == nil || result.IP4.IP.String() == "" {
+		return nil
+	}
+
+	hosts, err := ioutil.ReadFile(inspect.HostsPath)
+	ip := strings.SplitN(result.IP4.IP.String(), "/", 2)[0]
+	if os.IsNotExist(err) {
+		return nil
+	} else if err != nil {
+		return err
+	}
+
+	hostsString := string(hosts)
+	line := fmt.Sprintf("\n%s\t%s\n", ip, inspect.Config.Hostname)
+	if strings.Contains(hostsString, line) {
+		return nil
+	}
+
+	updatedHosts := hostsString + line
+	return ioutil.WriteFile(inspect.HostsPath, []byte(updatedHosts), 0644)
 }
 
 func (n *Manager) networkDown(id string, inspect types.ContainerJSON) error {

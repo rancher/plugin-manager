@@ -90,14 +90,14 @@ func (p PortRule) iptables() []byte {
 }
 
 func (w *watcher) insertBaseRules() error {
-	if w.run("iptables", "-t", "nat", "-C", "PREROUTING", "-m", "addrtype", "--dst-type", "LOCAL", "-j", "CATTLE_PREROUTING") != nil {
-		return w.run("iptables", "-t", "nat", "-I", "PREROUTING", "-m", "addrtype", "--dst-type", "LOCAL", "-j", "CATTLE_PREROUTING")
+	if w.run("iptables", "-w", "-t", "nat", "-C", "PREROUTING", "-m", "addrtype", "--dst-type", "LOCAL", "-j", "CATTLE_PREROUTING") != nil {
+		return w.run("iptables", "-w", "-t", "nat", "-I", "PREROUTING", "-m", "addrtype", "--dst-type", "LOCAL", "-j", "CATTLE_PREROUTING")
 	}
-	if w.run("iptables", "-C", "FORWARD", "-j", "CATTLE_FORWARD") != nil {
-		return w.run("iptables", "-I", "FORWARD", "-j", "CATTLE_FORWARD")
+	if w.run("iptables", "-w", "-C", "FORWARD", "-j", "CATTLE_FORWARD") != nil {
+		return w.run("iptables", "-w", "-I", "FORWARD", "-j", "CATTLE_FORWARD")
 	}
-	if w.run("iptables", "-t", "nat", "-C", "OUTPUT", "-m", "addrtype", "--dst-type", "LOCAL", "-j", "CATTLE_OUTPUT") != nil {
-		return w.run("iptables", "-t", "nat", "-I", "OUTPUT", "-m", "addrtype", "--dst-type", "LOCAL", "-j", "CATTLE_OUTPUT")
+	if w.run("iptables", "-w", "-t", "nat", "-C", "OUTPUT", "-m", "addrtype", "--dst-type", "LOCAL", "-j", "CATTLE_OUTPUT") != nil {
+		return w.run("iptables", "-w", "-t", "nat", "-I", "OUTPUT", "-m", "addrtype", "--dst-type", "LOCAL", "-j", "CATTLE_OUTPUT")
 	}
 	return nil
 }
@@ -212,6 +212,7 @@ func (w *watcher) apply(rules map[string]PortRule) error {
 	cmd.Stdout = os.Stdout
 	cmd.Stdin = buf
 	if err := cmd.Run(); err != nil {
+		logrus.Errorf("Failed to apply port rules\n%s", buf)
 		return err
 	}
 
