@@ -13,6 +13,7 @@ import (
 	"github.com/rancher/plugin-manager/hostnat"
 	"github.com/rancher/plugin-manager/hostports"
 	"github.com/rancher/plugin-manager/network"
+	"github.com/rancher/plugin-manager/reaper"
 	"github.com/urfave/cli"
 )
 
@@ -41,20 +42,26 @@ func run(c *cli.Context) error {
 		logrus.SetLevel(logrus.DebugLevel)
 	}
 
+	dClient, err := client.NewEnvClient()
+	if err != nil {
+		return err
+	}
+
+	reaper.CheckMetadata(dClient, true)
+
 	logrus.Infof("Waiting for metadata")
 	mClient, err := metadata.NewClientAndWait(c.String("metadata-url"))
 	if err != nil {
 		return errors.Wrap(err, "Creating metadata client")
 	}
 
-	dClient, err := client.NewEnvClient()
+	manager, err := network.NewManager(dClient)
 	if err != nil {
 		return err
 	}
 
-	manager, err := network.NewManager(dClient)
-	if err != nil {
-		return err
+	if err := reaper.Watch(dClient, mClient); err != nil {
+		logrus.Errorf("Failed to start unmanaged container reaper: %v", err)
 	}
 
 	if err := hostports.Watch(mClient); err != nil {
