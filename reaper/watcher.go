@@ -7,6 +7,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/engine-api/client"
 	"github.com/docker/engine-api/types"
+	"github.com/jpillora/backoff"
 	"github.com/rancher/go-rancher-metadata/metadata"
 )
 
@@ -25,13 +26,28 @@ func Watch(dockerClient *client.Client, c metadata.Client) error {
 		c:  c,
 	}
 	go c.OnChange(5, w.onChangeNoError)
+	go watchMetadata(dockerClient)
 	return nil
 }
 
+func watchMetadata(dockerClient *client.Client) {
+	b := &backoff.Backoff{
+		Min:    1 * time.Second,
+		Max:    5 * time.Minute,
+		Factor: 1.5,
+	}
+	for {
+		err := CheckMetadata(dockerClient, false)
+		if err != nil {
+			logrus.Errorf("Failed to check for bad metadata: %v", err)
+		}
+		time.Sleep(b.Duration())
+	}
+}
+
 type watcher struct {
-	dc                *client.Client
-	c                 metadata.Client
-	lastMetadataCheck time.Time
+	dc *client.Client
+	c  metadata.Client
 }
 
 func (w *watcher) onChangeNoError(version string) {
@@ -63,13 +79,6 @@ func (w *watcher) onChange(version string) error {
 		if container.State == "running" && container.UUID != uuid {
 			w.stopContainer(container)
 		}
-	}
-
-	if time.Now().Sub(w.lastMetadataCheck) > recheckEvery {
-		if err := CheckMetadata(w.dc, false); err != nil {
-			return err
-		}
-		w.lastMetadataCheck = time.Now()
 	}
 
 	return nil
