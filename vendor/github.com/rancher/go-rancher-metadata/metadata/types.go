@@ -47,6 +47,7 @@ type Container struct {
 	Ips                      []string          `json:"ips"`
 	Ports                    []string          `json:"ports"`
 	ServiceName              string            `json:"service_name"`
+	ServiceIndex             string            `json:"service_index"`
 	StackName                string            `json:"stack_name"`
 	Labels                   map[string]string `json:"labels"`
 	CreateIndex              int               `json:"create_index"`
@@ -63,6 +64,8 @@ type Container struct {
 	HealthCheckHosts         []string          `json:"health_check_hosts"`
 	NetworkFromContainerUUID string            `json:"network_from_container_uuid"`
 	NetworkUUID              string            `json:"network_uuid"`
+	Links                    map[string]string `json:"links"`
+	System                   bool              `json:"system"`
 }
 
 type Network struct {
