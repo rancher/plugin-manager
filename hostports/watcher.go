@@ -80,8 +80,13 @@ func (p PortRule) iptables() []byte {
 	buf.WriteString(":")
 	buf.WriteString(p.TargetPort)
 
-	buf.WriteString(fmt.Sprintf("\n-A CATTLE_PREROUTING -p %v -m %v --dport %v -m addrtype --dst-type LOCAL -j DNAT --to-destination %v:%v",
-		p.Protocol, p.Protocol, p.SourcePort, p.TargetIP, p.TargetPort))
+	if p.SourceIP == "0.0.0.0" {
+		buf.WriteString(fmt.Sprintf("\n-A CATTLE_PREROUTING -p %v -m %v --dport %v -m addrtype --dst-type LOCAL -j DNAT --to-destination %v:%v",
+			p.Protocol, p.Protocol, p.SourcePort, p.TargetIP, p.TargetPort))
+	} else {
+		buf.WriteString(fmt.Sprintf("\n-A CATTLE_PREROUTING -p %v -m %v --dport %v -d %v -j DNAT --to-destination %v:%v",
+			p.Protocol, p.Protocol, p.SourcePort, p.SourceIP, p.TargetIP, p.TargetPort))
+	}
 
 	buf.WriteString(fmt.Sprintf("\n-A CATTLE_OUTPUT -p %v -m %v --dport %v -m addrtype --dst-type LOCAL -j DNAT --to-destination %v:%v",
 		p.Protocol, p.Protocol, p.SourcePort, p.TargetIP, p.TargetPort))
