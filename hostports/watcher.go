@@ -15,7 +15,8 @@ import (
 )
 
 var (
-	reapplyEvery = 5 * time.Minute
+	reapplyEvery   = 5 * time.Minute
+	hostPortsLabel = "io.rancher.network.host_ports"
 )
 
 // Watch is used to monitor metadata for changes
@@ -149,7 +150,7 @@ func (w *watcher) onChange(version string) error {
 		}
 
 		if container.HostUUID != host.UUID ||
-			!network.HostPorts ||
+			!(network.HostPorts || (container.System && container.Labels[hostPortsLabel] == "true")) ||
 			container.PrimaryIp == "" {
 			continue
 		}
