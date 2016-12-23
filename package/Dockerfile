@@ -1,5 +1,5 @@
-FROM rancher/agent-base:v0.2.0
+FROM rancher/agent-base:v0.3.0
 RUN ln -s / /mnt/sda1
 COPY plugin-manager start.sh /usr/bin/
-ENTRYPOINT ["/usr/bin/start.sh"]
+ENTRYPOINT ["/rancher-entrypoint.sh", "/usr/bin/start.sh"]
 CMD ["plugin-manager"]
