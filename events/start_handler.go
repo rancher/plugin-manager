@@ -63,6 +63,11 @@ func setupResolvConf(container *docker.Container) error {
 		return nil
 	}
 
+	if container.ResolvConfPath == "/etc/resolv.conf" {
+		// Don't shoot ourself in the foot and change our own DNS
+		return nil
+	}
+
 	input, err := os.Open(container.ResolvConfPath)
 	if err != nil {
 		return err
