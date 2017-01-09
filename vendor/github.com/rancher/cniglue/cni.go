@@ -66,6 +66,10 @@ func NewCNIExec(state *DockerPluginState) (*CNIExec, error) {
 		c.runtimeConf.Args = append(c.runtimeConf.Args, [2]string{"RancherContainerUUID", uuid})
 	}
 
+	if linkMTUOverhead, ok := state.Config.Labels["io.rancher.cni.link_mtu_overhead"]; ok {
+		c.runtimeConf.Args = append(c.runtimeConf.Args, [2]string{"LinkMTUOverhead", linkMTUOverhead})
+	}
+
 	network := state.HostConfig.NetworkMode.NetworkName()
 	if network == "" {
 		network = "default"
