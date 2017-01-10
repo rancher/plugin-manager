@@ -23,6 +23,7 @@ const (
 	IPLabel               = "io.rancher.container.ip"
 	LegacyManagedNetLabel = "io.rancher.container.network"
 	CNILabel              = "io.rancher.cni.network"
+	rootStateDir          = "/var/lib/rancher/state/cni"
 )
 
 type Manager struct {
@@ -32,7 +33,7 @@ type Manager struct {
 }
 
 func NewManager(c *client.Client) (*Manager, error) {
-	s, err := newState(c)
+	s, err := newState(rootStateDir, c)
 	if err != nil {
 		return nil, err
 	}
@@ -43,7 +44,7 @@ func NewManager(c *client.Client) (*Manager, error) {
 	}, nil
 }
 
-// Evaluate checks the state and enableds networking if needed
+// Evaluate checks the state and enables networking if needed
 func (n *Manager) Evaluate(id string) error {
 	return n.evaluate(id, 0)
 }
@@ -100,18 +101,20 @@ func (n *Manager) retry(id string, retryCount int) {
 	}
 }
 
-func (n *Manager) networkUp(id string, inspect types.ContainerJSON, retryCount int) error {
+func (n *Manager) networkUp(id string, inspect types.ContainerJSON, retryCount int) (err error) {
 	logrus.WithFields(logrus.Fields{"networkMode": inspect.HostConfig.NetworkMode, "cid": inspect.ID}).Infof("CNI up")
+	startedAt := inspect.State.StartedAt
+
 	pluginState, err := glue.LookupPluginState(inspect)
 	if err != nil {
-		return errors.Wrap(err, "Finding plugin state")
+		return n.s.recordNetworkUpError(id, startedAt, errors.Wrap(err, "Couldn't find plugin state"))
 	}
 	result, err := glue.CNIAdd(pluginState)
 	if err != nil {
 		if retryCount < maxRetries {
 			go n.retry(id, retryCount+1)
 		}
-		return errors.Wrap(err, "Bringing up networking")
+		return n.s.recordNetworkUpError(id, startedAt, errors.Wrap(err, "Couldn't bring up network"))
 	}
 	logrus.WithFields(logrus.Fields{
 		"networkMode": inspect.HostConfig.NetworkMode,
@@ -119,9 +122,9 @@ func (n *Manager) networkUp(id string, inspect types.ContainerJSON, retryCount i
 		"result":      result,
 	}).Infof("CNI up done")
 	if err := n.setupHosts(inspect, result); err != nil {
-		return err
+		return n.s.recordNetworkUpError(id, startedAt, errors.Wrap(err, "Couldn't setup hosts"))
 	}
-	n.s.Started(id, inspect.State.StartedAt)
+	n.s.Started(id, inspect.State.StartedAt, result)
 	return nil
 }
 
