@@ -33,12 +33,12 @@ func (de *DockerEventsProcessor) Process() error {
 
 	nmHandler := &NetworkManagerHandler{de.nm}
 	handlers := map[string][]Handler{
-		"start": []Handler{
+		"start": {
 			de.bw,
 			&StartHandler{dockerClient},
 			nmHandler,
 		},
-		"die": []Handler{
+		"die": {
 			nmHandler,
 		},
 	}
