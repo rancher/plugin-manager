@@ -70,6 +70,10 @@ func NewCNIExec(state *DockerPluginState) (*CNIExec, error) {
 		c.runtimeConf.Args = append(c.runtimeConf.Args, [2]string{"LinkMTUOverhead", linkMTUOverhead})
 	}
 
+	if MACAddress, ok := state.Config.Labels["io.rancher.container.mac_address"]; ok {
+		c.runtimeConf.Args = append(c.runtimeConf.Args, [2]string{"MACAddress", MACAddress})
+	}
+
 	network := state.HostConfig.NetworkMode.NetworkName()
 	if network == "" {
 		network = "default"
