@@ -13,13 +13,12 @@ import (
 )
 
 const (
-	RancherSystemLabelKey = "io.rancher.container.system"
-	RancherNameserver     = "169.254.169.250"
-	RancherDomain         = "rancher.internal"
-	RancherDNS            = "io.rancher.container.dns"
-	RancherIP             = "io.rancher.container.ip"
-	RancherNetwork        = "io.rancher.container.network"
-	CNILabel              = "io.rancher.cni.network"
+	RancherNameserver = "169.254.169.250"
+	RancherDomain     = "rancher.internal"
+	RancherDNS        = "io.rancher.container.dns"
+	RancherIP         = "io.rancher.container.ip"
+	RancherNetwork    = "io.rancher.container.network"
+	CNILabel          = "io.rancher.cni.network"
 )
 
 type StartHandler struct {
@@ -59,10 +58,6 @@ func getDNSSearch(container *docker.Container) []string {
 }
 
 func setupResolvConf(container *docker.Container) error {
-	if _, ok := container.Config.Labels[RancherSystemLabelKey]; ok {
-		return nil
-	}
-
 	if container.ResolvConfPath == "/etc/resolv.conf" {
 		// Don't shoot ourself in the foot and change our own DNS
 		return nil

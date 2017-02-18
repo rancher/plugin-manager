@@ -113,6 +113,7 @@ func (n *Manager) networkUp(id string, inspect types.ContainerJSON, retryCount i
 	if err != nil {
 		if retryCount < maxRetries {
 			go n.retry(id, retryCount+1)
+			return err
 		}
 		return n.s.recordNetworkUpError(id, startedAt, errors.Wrap(err, "Couldn't bring up network"))
 	}
