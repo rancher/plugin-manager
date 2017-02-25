@@ -13,12 +13,13 @@ import (
 )
 
 const (
-	RancherNameserver = "169.254.169.250"
-	RancherDomain     = "rancher.internal"
-	RancherDNS        = "io.rancher.container.dns"
-	RancherIP         = "io.rancher.container.ip"
-	RancherNetwork    = "io.rancher.container.network"
-	CNILabel          = "io.rancher.cni.network"
+	RancherNameserver  = "169.254.169.250"
+	RancherDomain      = "rancher.internal"
+	RancherDNS         = "io.rancher.container.dns"
+	RancherDNSPriority = "io.rancher.container.dns.priority"
+	RancherIP          = "io.rancher.container.ip"
+	RancherNetwork     = "io.rancher.container.network"
+	CNILabel           = "io.rancher.cni.network"
 )
 
 type StartHandler struct {
@@ -54,12 +55,16 @@ func getDNSSearch(container *docker.Container) []string {
 
 	// default rancher domain
 	defaultDomains = append(defaultDomains, RancherDomain)
+
+	log.Debugf("defaultDomains: %v", defaultDomains)
 	return defaultDomains
 }
 
 func setupResolvConf(container *docker.Container) error {
+	log.Debugf("setupResolvConf for container: %+v", container)
 	if container.ResolvConfPath == "/etc/resolv.conf" {
 		// Don't shoot ourself in the foot and change our own DNS
+		log.Debugf("resolv.conf already set for container: %v, skipping", container.ID)
 		return nil
 	}
 
@@ -84,12 +89,24 @@ func setupResolvConf(container *docker.Container) error {
 		}
 
 		if strings.HasPrefix(text, "search") {
+			existingSearchList := strings.Split(text, " ")
+			domainsToBeAdded := []string{}
+			finalSearchList := []string{"search"}
 			for _, domain := range getDNSSearch(container) {
 				if strings.Contains(text, " "+domain) {
 					continue
 				}
-				text = text + " " + domain
+				domainsToBeAdded = append(domainsToBeAdded, domain)
 			}
+			if value, ok := container.Config.Labels[RancherDNSPriority]; ok && value == "service_last" {
+				finalSearchList = append(finalSearchList, existingSearchList[1:]...)
+				finalSearchList = append(finalSearchList, domainsToBeAdded...)
+			} else {
+				finalSearchList = append(finalSearchList, domainsToBeAdded...)
+				finalSearchList = append(finalSearchList, existingSearchList[1:]...)
+			}
+			text = strings.Join(finalSearchList, " ")
+			log.Debugf("text: %v", text)
 			searchSet = true
 		}
 
