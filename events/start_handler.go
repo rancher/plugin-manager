@@ -89,23 +89,19 @@ func setupResolvConf(container *docker.Container) error {
 		}
 
 		if strings.HasPrefix(text, "search") {
-			existingSearchList := strings.Split(text, " ")
 			domainsToBeAdded := []string{}
-			finalSearchList := []string{"search"}
 			for _, domain := range getDNSSearch(container) {
 				if strings.Contains(text, " "+domain) {
 					continue
 				}
 				domainsToBeAdded = append(domainsToBeAdded, domain)
 			}
-			if value, ok := container.Config.Labels[RancherDNSPriority]; ok && value == "service_last" {
-				finalSearchList = append(finalSearchList, existingSearchList[1:]...)
-				finalSearchList = append(finalSearchList, domainsToBeAdded...)
+
+			if container.Config.Labels[RancherDNSPriority] == "service_last" {
+				text = text + " " + strings.Join(domainsToBeAdded, " ")
 			} else {
-				finalSearchList = append(finalSearchList, domainsToBeAdded...)
-				finalSearchList = append(finalSearchList, existingSearchList[1:]...)
+				text = strings.Replace(text, "search", "search "+strings.Join(domainsToBeAdded, " "), 1)
 			}
-			text = strings.Join(finalSearchList, " ")
 			log.Debugf("text: %v", text)
 			searchSet = true
 		}
