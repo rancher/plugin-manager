@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/Sirupsen/logrus"
@@ -14,9 +15,11 @@ import (
 	"github.com/rancher/plugin-manager/hostports"
 	"github.com/rancher/plugin-manager/network"
 	"github.com/rancher/plugin-manager/reaper"
+	"github.com/rancher/plugin-manager/routesync"
 	"github.com/urfave/cli"
 )
 
+// VERSION of the binary, that can be changed during build
 var VERSION = "v0.0.0-dev"
 
 func main() {
@@ -27,6 +30,11 @@ func main() {
 		cli.StringFlag{
 			Name:  "metadata-url",
 			Value: "http://rancher-metadata/2016-07-29",
+		},
+		cli.StringFlag{
+			Name:  "routesync-interval",
+			Usage: fmt.Sprintf("Customize the interval of routesync in seconds (default: %v)", routesync.DefaultSyncInterval),
+			Value: "",
 		},
 		cli.BoolFlag{
 			Name:  "debug",
@@ -40,6 +48,11 @@ func main() {
 func run(c *cli.Context) error {
 	if c.Bool("debug") {
 		logrus.SetLevel(logrus.DebugLevel)
+	}
+
+	if err := routesync.Watch(c.String("routesync-interval")); err != nil {
+		logrus.Errorf("Failed to start routesync: %v", err)
+		return err
 	}
 
 	dClient, err := client.NewEnvClient()

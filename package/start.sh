@@ -15,8 +15,4 @@ if [ -n "${NETWORK_AGENT}" ]; then
     docker rm -fv ${NETWORK_AGENT}
 fi
 
-if [ -n "$DOCKER_BRIDGE" ] && [ -n "$METADATA_IP" ]; then
-    ip route add ${METADATA_IP}/32 dev ${DOCKER_BRIDGE} 2>/dev/null || true
-fi
-
 exec "$@"
