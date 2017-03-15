@@ -17,7 +17,6 @@ const (
 	RancherDomain      = "rancher.internal"
 	RancherDNS         = "io.rancher.container.dns"
 	RancherDNSPriority = "io.rancher.container.dns.priority"
-	RancherIP          = "io.rancher.container.ip"
 	RancherNetwork     = "io.rancher.container.network"
 	CNILabel           = "io.rancher.cni.network"
 )
@@ -154,7 +153,7 @@ func (h *StartHandler) Handle(event *docker.APIEvents) error {
 	}
 
 	if c.Config.Labels[CNILabel] != "" || c.Config.Labels[RancherDNS] == "true" ||
-		c.Config.Labels[RancherNetwork] == "true" || c.Config.Labels[RancherIP] != "" {
+		c.Config.Labels[RancherNetwork] == "true" {
 		log.Infof("Setting up resolv.conf for ContainerId [%s]", event.ID)
 		return setupResolvConf(c)
 	}
