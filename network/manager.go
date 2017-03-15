@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	maxRetries            = 60
+	maxRetries            = 15
 	IPLabel               = "io.rancher.container.ip"
 	LegacyManagedNetLabel = "io.rancher.container.network"
 	CNILabel              = "io.rancher.cni.network"
@@ -95,7 +95,7 @@ func (n *Manager) evaluate(id string, retryCount int) error {
 
 func (n *Manager) retry(id string, retryCount int) {
 	time.Sleep(2 * time.Second)
-	logrus.WithField("cid", id).Infof("Evaluating state from retry")
+	logrus.WithFields(logrus.Fields{"cid": id, "count": retryCount}).Infof("Evaluating state from retry")
 	if err := n.evaluate(id, retryCount); err != nil {
 		logrus.Errorf("Failed to evaluate networking: %v", err)
 	}
