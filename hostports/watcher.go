@@ -152,7 +152,7 @@ func (w *watcher) onChange(version string) error {
 		network := networks[container.NetworkUUID]
 		bridge := ""
 
-		if container.State != "running" {
+		if container.State != "running" && container.State != "starting" {
 			continue
 		}
 
