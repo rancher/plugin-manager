@@ -18,30 +18,28 @@ var (
 
 // Watch makes sure the needed routes are programmed inside the container
 func Watch(syncIntervalStr string) error {
-	logrus.Debugf("routesynce: syncIntervalStr: %v", syncIntervalStr)
+	logrus.Debugf("routesync: syncIntervalStr: %v", syncIntervalStr)
 
-	var syncInterval int
-	if syncIntervalStr != "" {
-		i, err := strconv.Atoi(syncIntervalStr)
-		if err != nil {
-			syncInterval = DefaultSyncInterval
-		} else {
-			syncInterval = i
-		}
-	} else {
-		syncInterval = DefaultSyncInterval
+	syncInterval := DefaultSyncInterval
+	if i, err := strconv.Atoi(syncIntervalStr); err != nil {
+		syncInterval = i
 	}
 
 	//if conditions met, start the watcher
 	conditionsMet, bridgeName, metadataIP := conditionsMetToWatch()
 
-	if conditionsMet {
-		err := addRouteToMetadataIP(bridgeName, metadataIP)
-		if err != nil {
-			return err
-		}
-		go doRouteSync(bridgeName, metadataIP, syncInterval)
+	if !conditionsMet {
+		logrus.Debugf("routesync: conditions not met, hence not starting goroutine")
+		return nil
 	}
+
+	// Add the route first before starting the goroutine so that
+	// rest of the logic can do it's work
+	if err := addRouteToMetadataIP(bridgeName, metadataIP); err != nil {
+		return err
+	}
+
+	go doRouteSync(bridgeName, metadataIP, syncInterval)
 	return nil
 }
 
@@ -51,7 +49,7 @@ func doRouteSync(bridgeName, metadataIP string, syncInterval int) {
 		logrus.Debugf("routesync: time to sync routes")
 		err := addRouteToMetadataIP(bridgeName, metadataIP)
 		if err != nil {
-			logrus.Errorf("routesynce: while syncing routes, got error: %v", err)
+			logrus.Errorf("routesync: while syncing routes, got error: %v", err)
 		}
 	}
 }
@@ -71,7 +69,7 @@ func conditionsMetToWatch() (bool, string, string) {
 }
 
 func addRouteToMetadataIP(bridgeName, metadataIP string) error {
-	logrus.Debugf("routesynce: adding route to metadata IP address")
+	logrus.Debugf("routesync: adding route to metadata IP address")
 
 	l, err := netlink.LinkByName(bridgeName)
 	if err != nil {
