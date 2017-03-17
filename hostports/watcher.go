@@ -214,7 +214,9 @@ func (w *watcher) apply(rules map[string]PortRule) error {
 
 	buf.WriteString("\nCOMMIT\n\n*filter\n:CATTLE_FORWARD -\n")
 	buf.WriteString("-F CATTLE_FORWARD\n")
-	buf.WriteString("-A CATTLE_FORWARD -m mark --mark 4200 -j ACCEPT\n")
+	buf.WriteString("-A CATTLE_FORWARD -m mark --mark 0x1068 -j ACCEPT\n")
+	// For k8s
+	buf.WriteString("-A CATTLE_FORWARD -m mark --mark 0x4000 -j ACCEPT\n")
 
 	buf.WriteString("\nCOMMIT\n")
 
