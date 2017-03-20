@@ -21,7 +21,7 @@ func Watch(syncIntervalStr string) error {
 	logrus.Debugf("routesync: syncIntervalStr: %v", syncIntervalStr)
 
 	syncInterval := DefaultSyncInterval
-	if i, err := strconv.Atoi(syncIntervalStr); err != nil {
+	if i, err := strconv.Atoi(syncIntervalStr); err == nil {
 		syncInterval = i
 	}
 
@@ -44,6 +44,7 @@ func Watch(syncIntervalStr string) error {
 }
 
 func doRouteSync(bridgeName, metadataIP string, syncInterval int) {
+	logrus.Infof("routesync: starting monitoring on bridge: %v, for metadataIP: %v every %v seconds", bridgeName, metadataIP, syncInterval)
 	for {
 		time.Sleep(time.Duration(syncInterval) * time.Second)
 		logrus.Debugf("routesync: time to sync routes")
