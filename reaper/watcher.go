@@ -76,8 +76,8 @@ func (w *watcher) onChange(version string) error {
 			continue
 		}
 
-		if container.State == "running" && container.UUID != uuid {
-			w.stopContainer(container)
+		if container.UUID != uuid {
+			w.removeContainer(container)
 		}
 	}
 
@@ -136,11 +136,12 @@ func CheckMetadata(dockerClient *client.Client, first bool) error {
 	return nil
 }
 
-func (w *watcher) stopContainer(container metadata.Container) {
-	logrus.Infof("Stopping unmanaged container %s %s", container.Name, container.ExternalId)
-	timeout := time.Duration(0)
-	err := w.dc.ContainerStop(context.Background(), container.ExternalId, &timeout)
+func (w *watcher) removeContainer(container metadata.Container) {
+	logrus.Infof("Removing unmanaged container %s %s", container.Name, container.ExternalId)
+	err := w.dc.ContainerRemove(context.Background(), container.ExternalId, types.ContainerRemoveOptions{
+		Force: true,
+	})
 	if err != nil {
-		logrus.Errorf("Stop failed: %v", err)
+		logrus.Errorf("Removed failed: %v", err)
 	}
 }
