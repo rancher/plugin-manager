@@ -45,37 +45,6 @@ func Watch(syncIntervalStr string, mc metadata.Client) error {
 	return nil
 }
 
-// getBridgeInfo returns the name of the bridge used by the CNI plugin
-// and also the subnet used.
-func getBridgeInfo(network metadata.Network) (string, string, error) {
-
-	bridge := ""
-	bridgeSubnet := ""
-	conf, _ := network.Metadata["cniConfig"].(map[string]interface{})
-	for _, file := range conf {
-		props, _ := file.(map[string]interface{})
-		cniType, _ := props["type"].(string)
-		checkBridge, _ := props["bridge"].(string)
-		checkBridgeSubnet, _ := props["bridgeSubnet"].(string)
-
-		if cniType == "rancher-bridge" {
-			if checkBridge != "" {
-				bridge = checkBridge
-			} else {
-				return "", "", fmt.Errorf("error: bridge is empty in CNI config")
-			}
-			if checkBridgeSubnet != "" {
-				bridgeSubnet = checkBridgeSubnet
-			} else {
-				return "", "", fmt.Errorf("error: bridgeSubnet is empty in CNI config")
-			}
-			return bridge, bridgeSubnet, nil
-		}
-	}
-
-	return "", "", fmt.Errorf("arpsync: couldn't find bridge info")
-}
-
 func buildContainersMap(containers []metadata.Container, network metadata.Network) (map[string]*metadata.Container, error) {
 	containersMap := make(map[string]*metadata.Container)
 
@@ -156,26 +125,6 @@ func (atw *ARPTableWatcher) doSync() error {
 	}
 	logrus.Debugf("arpsync: localNetwork: %+v", localNetwork)
 
-	// Get the network config
-	bridge, bridgeSubnetStr, err := getBridgeInfo(localNetwork)
-	if err != nil {
-		return err
-	}
-	logrus.Debugf("arpsync: bridge=%v, bridgeSubnet=%v", bridge, bridgeSubnetStr)
-
-	bridgeLink, err := netlink.LinkByName(bridge)
-	if err != nil {
-		logrus.Errorf("arpsync: error fetching LinkByName for bridge: %v", bridge)
-		return err
-	}
-	logrus.Debugf("arpsync: bridgeLink=%#v", bridgeLink)
-
-	_, bridgeSubnet, err := net.ParseCIDR(bridgeSubnetStr)
-	if err != nil {
-		logrus.Errorf("arpsync: error parsing bridgeSubnet: %v", bridgeSubnetStr)
-		return err
-	}
-
 	// Read the ARP table
 	entries, err := netlink.NeighList(0, netlink.FAMILY_V4)
 	if err != nil {
@@ -192,13 +141,7 @@ func (atw *ARPTableWatcher) doSync() error {
 	containersMap, err := buildContainersMap(containers, localNetwork)
 	//logrus.Debugf("arpsync: containersMap: %v", containersMap)
 
-	// We only care about Rancher Managed IP addresses and
-	// the IP Address of Rancher Metadata
-	bridgeLinkIndex := bridgeLink.Attrs().Index
 	for _, aEntry := range entries {
-		if !(aEntry.LinkIndex == bridgeLinkIndex && bridgeSubnet.Contains(aEntry.IP)) {
-			continue
-		}
 		//logrus.Debugf("arpsync: aEntry: %+v", aEntry)
 		if container, found := containersMap[aEntry.IP.String()]; found {
 			if container.HostUUID == host.UUID {
