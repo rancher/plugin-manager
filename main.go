@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/go-rancher-metadata/metadata"
 	"github.com/rancher/plugin-manager/binexec"
 	"github.com/rancher/plugin-manager/cniconf"
+	"github.com/rancher/plugin-manager/conntracksync"
 	"github.com/rancher/plugin-manager/events"
 	"github.com/rancher/plugin-manager/hostnat"
 	"github.com/rancher/plugin-manager/hostports"
@@ -30,6 +31,11 @@ func main() {
 		cli.StringFlag{
 			Name:  "metadata-url",
 			Value: "http://rancher-metadata/2016-07-29",
+		},
+		cli.StringFlag{
+			Name:  "conntracksync-interval",
+			Usage: fmt.Sprintf("Customize the interval of conntracksync in seconds (default: %v)", conntracksync.DefaultSyncInterval),
+			Value: "",
 		},
 		cli.StringFlag{
 			Name:  "routesync-interval",
@@ -83,6 +89,10 @@ func run(c *cli.Context) error {
 
 	if err := hostnat.Watch(mClient); err != nil {
 		logrus.Errorf("Failed to start host nat configuration: %v", err)
+	}
+
+	if err := conntracksync.Watch(c.String("conntracksync-interval"), mClient); err != nil {
+		logrus.Errorf("Failed to start conntracksync: %v", err)
 	}
 
 	if err := cniconf.Watch(mClient); err != nil {
