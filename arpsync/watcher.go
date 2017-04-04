@@ -45,11 +45,14 @@ func Watch(syncIntervalStr string, mc metadata.Client) error {
 	return nil
 }
 
-func buildContainersMap(containers []metadata.Container, network metadata.Network) (map[string]*metadata.Container, error) {
+func buildContainersMap(containers []metadata.Container,
+	network metadata.Network) (map[string]*metadata.Container, error) {
 	containersMap := make(map[string]*metadata.Container)
 
 	for index, aContainer := range containers {
-		if !(aContainer.PrimaryIp != "" && aContainer.NetworkUUID == network.UUID) {
+		if !(aContainer.PrimaryIp != "" &&
+			aContainer.PrimaryMacAddress != "" &&
+			aContainer.NetworkUUID == network.UUID) {
 			continue
 		}
 		containersMap[aContainer.PrimaryIp] = &containers[index]
@@ -59,7 +62,6 @@ func buildContainersMap(containers []metadata.Container, network metadata.Networ
 }
 
 func (atw *ARPTableWatcher) syncLoop() {
-
 	logrus.Infof("arpsync: starting monitoring every %v seconds", atw.syncInterval)
 	for {
 		time.Sleep(atw.syncInterval)
@@ -139,52 +141,41 @@ func (atw *ARPTableWatcher) doSync() error {
 		return err
 	}
 	containersMap, err := buildContainersMap(containers, localNetwork)
-	//logrus.Debugf("arpsync: containersMap: %v", containersMap)
 
 	for _, aEntry := range entries {
-		//logrus.Debugf("arpsync: aEntry: %+v", aEntry)
 		if container, found := containersMap[aEntry.IP.String()]; found {
 			if container.HostUUID == host.UUID {
 				if container.PrimaryMacAddress != aEntry.HardwareAddr.String() {
 					logrus.Infof("arpsync: wrong ARP entry found=%+v(expected: %v) for local container, fixing it", aEntry, container.PrimaryMacAddress)
-
-					var newHardwareAddr net.HardwareAddr
-					if newHardwareAddr, err = net.ParseMAC(container.PrimaryMacAddress); err != nil {
-						logrus.Errorf("arpsync: couldn't parse MAC address(%v): %v", container.PrimaryMacAddress, err)
-						continue
-					}
-					newEntry := aEntry
-					newEntry.HardwareAddr = newHardwareAddr
-					newEntry.Type = netlink.NUD_REACHABLE
-					if err := netlink.NeighSet(&newEntry); err != nil {
-						logrus.Errorf("arpsync: error changing ARP entry: %v", err)
-					}
+					fixARPEntry(aEntry, container.PrimaryMacAddress)
 				}
 			} else {
 				if aEntry.HardwareAddr.String() != networkDriverMacAddress {
 					logrus.Errorf("arpsync: wrong ARP entry found=%+v(expected: %v) for remote container, fixing it", aEntry, networkDriverMacAddress)
-
-					var newHardwareAddr net.HardwareAddr
-					if newHardwareAddr, err = net.ParseMAC(networkDriverMacAddress); err != nil {
-						logrus.Errorf("arpsync: couldn't parse MAC address(%v): %v", networkDriverMacAddress, err)
-						continue
-					}
-					newEntry := aEntry
-					newEntry.HardwareAddr = newHardwareAddr
-					newEntry.Type = netlink.NUD_REACHABLE
-					if err := netlink.NeighSet(&newEntry); err != nil {
-						logrus.Errorf("arpsync: error changing ARP entry: %v", err)
-					}
+					fixARPEntry(aEntry, networkDriverMacAddress)
 				}
 			}
 		} else {
 			logrus.Debugf("arpsync: container not found for ARP entry: %+v", aEntry)
-			//if err := netlink.NeighDel(&aEntry); err != nil {
-			//	logrus.Errorf("arpsync: error deleting ARP entry(%+v): %v", aEntry, err)
-			//	continue
-			//}
 		}
 	}
 
+	return nil
+}
+
+func fixARPEntry(oldEntry netlink.Neigh, newMACAddress string) error {
+	var err error
+	var newHardwareAddr net.HardwareAddr
+	if newHardwareAddr, err = net.ParseMAC(newMACAddress); err != nil {
+		logrus.Errorf("arpsync: couldn't parse MAC address(%v): %v", newMACAddress, err)
+		return err
+	}
+	newEntry := oldEntry
+	newEntry.HardwareAddr = newHardwareAddr
+	newEntry.Type = netlink.NUD_REACHABLE
+	if err = netlink.NeighSet(&newEntry); err != nil {
+		logrus.Errorf("arpsync: error changing ARP entry: %v", err)
+		return err
+	}
 	return nil
 }
