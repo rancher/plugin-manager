@@ -48,7 +48,6 @@ func ListDNAT() ([]CTEntry, error) {
 
 // CTEntryCreate Addetes the given entry from the conntrack table
 func CTEntryCreate(e CTEntry) error {
-
 	cmd := exec.Command(
 		"conntrack", "--create",
 		"-p", e.Protocol,
@@ -72,7 +71,6 @@ func CTEntryCreate(e CTEntry) error {
 
 // CTEntryDelete deletes the given entry from the conntrack table
 func CTEntryDelete(e CTEntry) error {
-
 	cmd := exec.Command(
 		"conntrack", "--delete",
 		"-p", e.Protocol,
@@ -101,7 +99,6 @@ func cmdCTListDNAT() ([]CTEntry, error) {
 	if len(out) == 0 {
 		return nil, nil
 	}
-	//logrus.Debugf("out: %+v, len=%v", string(out), len(string(out)))
 	return parseMultipleEntries(string(out)), nil
 }
 
@@ -111,7 +108,6 @@ func parseMultipleEntries(input string) []CTEntry {
 		if line == "" {
 			continue
 		}
-		//logrus.Debugf("line: %v", line)
 		e := parseOneConntrackEntry(line)
 		entries = append(entries, e)
 	}

@@ -46,7 +46,6 @@ func Watch(syncIntervalStr string, mc metadata.Client) error {
 }
 
 func (ctw *ConntrackTableWatcher) syncLoop() {
-
 	logrus.Infof("conntracksync: starting monitoring every %v seconds", ctw.syncInterval)
 	for {
 		time.Sleep(ctw.syncInterval)
@@ -66,17 +65,14 @@ func (ctw *ConntrackTableWatcher) doSync() error {
 		logrus.Errorf("conntracksync: error building containersMap")
 		return err
 	}
-	//logrus.Debugf("conntracksync: containersMaps: %+v", containersMap)
 
 	ctEntries, err := conntrack.ListDNAT()
 	if err != nil {
 		logrus.Errorf("conntracksync: error fetching conntrack entries")
 		return err
 	}
-	//logrus.Debugf("ctEntries: %+v", ctEntries)
 
 	for _, ctEntry := range ctEntries {
-		//logrus.Debugf("conntracksync: checking ctEntry: %+v", ctEntry)
 		key := ctEntry.OriginalDestinationPort + "/" + ctEntry.Protocol
 		c, found := containersMap[key]
 		if !found {
@@ -112,9 +108,7 @@ func (ctw *ConntrackTableWatcher) buildContainersMaps() (
 			continue
 		}
 
-		//logrus.Debugf("conntracksync: aContainer: %+v", aContainer)
 		for _, aPort := range aContainer.Ports {
-			//logrus.Debugf("conntracksync: aPort: %v", aPort)
 			splits := strings.Split(aPort, ":")
 			if len(splits) != 3 {
 				continue
