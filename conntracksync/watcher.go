@@ -24,7 +24,7 @@ type ConntrackTableWatcher struct {
 	mc           metadata.Client
 }
 
-// Watch starts the go routine to periodically check the ARP table
+// Watch starts the go routine to periodically check the conntrack table
 // for any discrepancies
 func Watch(syncIntervalStr string, mc metadata.Client) error {
 	logrus.Debugf("ctsync: syncIntervalStr: %v", syncIntervalStr)
@@ -49,7 +49,7 @@ func (ctw *ConntrackTableWatcher) syncLoop() {
 	logrus.Infof("conntracksync: starting monitoring every %v seconds", ctw.syncInterval)
 	for {
 		time.Sleep(ctw.syncInterval)
-		logrus.Debugf("conntracksync: time to sync ARP table")
+		logrus.Debugf("conntracksync: time to sync conntrack table")
 		err := ctw.doSync()
 		if err != nil {
 			logrus.Errorf("conntracksync: while syncing, got error: %v", err)
@@ -58,8 +58,6 @@ func (ctw *ConntrackTableWatcher) syncLoop() {
 }
 
 func (ctw *ConntrackTableWatcher) doSync() error {
-	logrus.Debugf("conntracksync: checking the conntrack table")
-
 	containersMap, err := ctw.buildContainersMaps()
 	if err != nil {
 		logrus.Errorf("conntracksync: error building containersMap")
@@ -73,10 +71,16 @@ func (ctw *ConntrackTableWatcher) doSync() error {
 	}
 
 	for _, ctEntry := range ctEntries {
-		key := ctEntry.OriginalDestinationPort + "/" + ctEntry.Protocol
-		c, found := containersMap[key]
-		if !found {
-			continue
+		var c *metadata.Container
+		var specificEntryFound, genericEntryFound bool
+		specificKey := ctEntry.OriginalDestinationIP + ":" + ctEntry.OriginalDestinationPort + "/" + ctEntry.Protocol
+		c, specificEntryFound = containersMap[specificKey]
+		if !specificEntryFound {
+			genericKey := "0.0.0.0:" + ctEntry.OriginalDestinationPort + "/" + ctEntry.Protocol
+			c, genericEntryFound = containersMap[genericKey]
+			if !genericEntryFound {
+				continue
+			}
 		}
 		if ctEntry.ReplySourceIP != c.PrimaryIp {
 			logrus.Infof("conntracksync: deleting mismatching conntrack entry found: %v. [expected: %v, got: %v]", ctEntry, c.PrimaryIp, ctEntry.ReplySourceIP)
@@ -113,10 +117,11 @@ func (ctw *ConntrackTableWatcher) buildContainersMaps() (
 			if len(splits) != 3 {
 				continue
 			}
+			hostIP := splits[0]
 			hostPort := splits[1]
 			protocol := strings.Split(splits[2], "/")[1]
 
-			containersMap[hostPort+"/"+protocol] = &containers[index]
+			containersMap[hostIP+":"+hostPort+"/"+protocol] = &containers[index]
 		}
 	}
 
