@@ -8,6 +8,7 @@ import (
 	"github.com/docker/engine-api/client"
 	"github.com/pkg/errors"
 	"github.com/rancher/go-rancher-metadata/metadata"
+	"github.com/rancher/plugin-manager/arpsync"
 	"github.com/rancher/plugin-manager/binexec"
 	"github.com/rancher/plugin-manager/cniconf"
 	"github.com/rancher/plugin-manager/events"
@@ -34,6 +35,11 @@ func main() {
 		cli.StringFlag{
 			Name:  "routesync-interval",
 			Usage: fmt.Sprintf("Customize the interval of routesync in seconds (default: %v)", routesync.DefaultSyncInterval),
+			Value: "",
+		},
+		cli.StringFlag{
+			Name:  "arpsync-interval",
+			Usage: fmt.Sprintf("Customize the interval of arpsync in seconds (default: %v)", arpsync.DefaultSyncInterval),
 			Value: "",
 		},
 		cli.BoolFlag{
@@ -87,6 +93,10 @@ func run(c *cli.Context) error {
 
 	if err := cniconf.Watch(mClient); err != nil {
 		logrus.Errorf("Failed to start cni config: %v", err)
+	}
+
+	if err := arpsync.Watch(c.String("arpsync-interval"), mClient); err != nil {
+		logrus.Errorf("Failed to start arpsync: %v", err)
 	}
 
 	binWatcher := binexec.Watch(mClient, dClient)
