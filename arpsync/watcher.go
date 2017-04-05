@@ -13,7 +13,7 @@ import (
 
 var (
 	// DefaultSyncInterval specifies the default value for arpsync interval in seconds
-	DefaultSyncInterval = 120
+	DefaultSyncInterval = 5
 )
 
 // ARPTableWatcher checks the ARP table periodically for invalid entries

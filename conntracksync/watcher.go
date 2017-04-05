@@ -13,7 +13,7 @@ import (
 var (
 	// DefaultSyncInterval specifies the default value
 	// for conntracksync interval in seconds
-	DefaultSyncInterval = 120
+	DefaultSyncInterval = 5
 )
 
 // ConntrackTableWatcher checks the conntrack table periodically for invalid
