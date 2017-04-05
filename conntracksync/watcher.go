@@ -22,6 +22,7 @@ var (
 type ConntrackTableWatcher struct {
 	syncInterval time.Duration
 	mc           metadata.Client
+	lastApplied  time.Time
 }
 
 // Watch starts the go routine to periodically check the conntrack table
@@ -40,21 +41,23 @@ func Watch(syncIntervalStr string, mc metadata.Client) error {
 		mc:           mc,
 	}
 
-	go ctw.syncLoop()
+	go mc.OnChange(120, ctw.onChangeNoError)
 
 	return nil
 }
 
-func (ctw *ConntrackTableWatcher) syncLoop() {
-	logrus.Infof("conntracksync: starting monitoring every %v seconds", ctw.syncInterval)
-	for {
-		time.Sleep(ctw.syncInterval)
-		logrus.Debugf("conntracksync: time to sync conntrack table")
-		err := ctw.doSync()
-		if err != nil {
-			logrus.Errorf("conntracksync: while syncing, got error: %v", err)
-		}
+func (ctw *ConntrackTableWatcher) onChangeNoError(version string) {
+	logrus.Debugf("ctsync: metadata version: %v, lastApplied: %v", version, ctw.lastApplied)
+	timeSinceLastApplied := time.Now().Sub(ctw.lastApplied)
+	if timeSinceLastApplied < ctw.syncInterval {
+		timeToSleep := ctw.syncInterval - timeSinceLastApplied
+		logrus.Debugf("ctsync: sleeping for %v", timeToSleep)
+		time.Sleep(timeToSleep)
 	}
+	if err := ctw.doSync(); err != nil {
+		logrus.Errorf("ctsync: while syncing, got error: %v", err)
+	}
+	ctw.lastApplied = time.Now()
 }
 
 func (ctw *ConntrackTableWatcher) doSync() error {
