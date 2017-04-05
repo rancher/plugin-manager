@@ -22,6 +22,7 @@ var (
 type ARPTableWatcher struct {
 	syncInterval time.Duration
 	mc           metadata.Client
+	lastApplied  time.Time
 }
 
 // Watch starts the go routine to periodically check the ARP table
@@ -40,9 +41,23 @@ func Watch(syncIntervalStr string, mc metadata.Client) error {
 		mc:           mc,
 	}
 
-	go atw.syncLoop()
+	go mc.OnChange(120, atw.onChangeNoError)
 
 	return nil
+}
+
+func (atw *ARPTableWatcher) onChangeNoError(version string) {
+	logrus.Debugf("arpsync: metadata version: %v, lastApplied: %v", version, atw.lastApplied)
+	timeSinceLastApplied := time.Now().Sub(atw.lastApplied)
+	if timeSinceLastApplied < atw.syncInterval {
+		timeToSleep := atw.syncInterval - timeSinceLastApplied
+		logrus.Debugf("arpsync: sleeping for %v", timeToSleep)
+		time.Sleep(timeToSleep)
+	}
+	if err := atw.doSync(); err != nil {
+		logrus.Errorf("arpsync: while syncing, got error: %v", err)
+	}
+	atw.lastApplied = time.Now()
 }
 
 func buildContainersMap(containers []metadata.Container,
@@ -61,20 +76,8 @@ func buildContainersMap(containers []metadata.Container,
 	return containersMap, nil
 }
 
-func (atw *ARPTableWatcher) syncLoop() {
-	logrus.Infof("arpsync: starting monitoring every %v seconds", atw.syncInterval)
-	for {
-		time.Sleep(atw.syncInterval)
-		logrus.Debugf("arpsync: time to sync ARP table")
-		err := atw.doSync()
-		if err != nil {
-			logrus.Errorf("arpsync: while syncing, got error: %v", err)
-		}
-	}
-}
-
 func (atw *ARPTableWatcher) doSync() error {
-	logrus.Debugf("arpsync: checking the ARP table")
+	logrus.Debugf("arpsync: checking the ARP table %v", time.Now())
 	networks, err := atw.mc.GetNetworks()
 	if err != nil {
 		logrus.Errorf("arpsync: error fetching networks from metadata")
@@ -104,7 +107,6 @@ func (atw *ARPTableWatcher) doSync() error {
 			continue
 		}
 
-		logrus.Debugf("arpsync: service: %#v", service)
 		for _, aContainer := range service.Containers {
 			if aContainer.HostUUID == host.UUID {
 				networkDriverMacAddress = aContainer.PrimaryMacAddress
