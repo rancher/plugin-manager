@@ -174,7 +174,7 @@ func fixARPEntry(oldEntry netlink.Neigh, newMACAddress string) error {
 	}
 	newEntry := oldEntry
 	newEntry.HardwareAddr = newHardwareAddr
-	newEntry.Type = netlink.NUD_REACHABLE
+	newEntry.State = netlink.NUD_REACHABLE
 	if err = netlink.NeighSet(&newEntry); err != nil {
 		logrus.Errorf("arpsync: error changing ARP entry: %v", err)
 		return err
