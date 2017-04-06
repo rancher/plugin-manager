@@ -119,6 +119,7 @@ func parseOneConntrackEntry(e string) CTEntry {
 	shiftIndex := 0
 	ctEntry := CTEntry{}
 
+	logrus.Debugf("parsing conntrack entry: %v", e)
 	fields := strings.Fields(e)
 
 	ctEntry.Protocol = fields[protocolIndex]
@@ -129,16 +130,24 @@ func parseOneConntrackEntry(e string) CTEntry {
 	}
 
 	kv := strings.Split(fields[originalSourceIPIndex+shiftIndex], "=")
-	ctEntry.OriginalSourceIP = kv[1]
+	if len(kv) == 2 {
+		ctEntry.OriginalSourceIP = kv[1]
+	}
 
 	kv = strings.Split(fields[originalDestinationIPIndex+shiftIndex], "=")
-	ctEntry.OriginalDestinationIP = kv[1]
+	if len(kv) == 2 {
+		ctEntry.OriginalDestinationIP = kv[1]
+	}
 
 	kv = strings.Split(fields[originalSourcePortIndex+shiftIndex], "=")
-	ctEntry.OriginalSourcePort = kv[1]
+	if len(kv) == 2 {
+		ctEntry.OriginalSourcePort = kv[1]
+	}
 
 	kv = strings.Split(fields[originalDestinationPortIndex+shiftIndex], "=")
-	ctEntry.OriginalDestinationPort = kv[1]
+	if len(kv) == 2 {
+		ctEntry.OriginalDestinationPort = kv[1]
+	}
 
 	// Check if [UNREPLIED] or someother word is present
 	// and shift the index if needed
@@ -147,16 +156,24 @@ func parseOneConntrackEntry(e string) CTEntry {
 	}
 
 	kv = strings.Split(fields[replySourceIPIndex+shiftIndex], "=")
-	ctEntry.ReplySourceIP = kv[1]
+	if len(kv) == 2 {
+		ctEntry.ReplySourceIP = kv[1]
+	}
 
 	kv = strings.Split(fields[replyDestinationIPIndex+shiftIndex], "=")
-	ctEntry.ReplyDestinationIP = kv[1]
+	if len(kv) == 2 {
+		ctEntry.ReplyDestinationIP = kv[1]
+	}
 
 	kv = strings.Split(fields[replySourcePortIndex+shiftIndex], "=")
-	ctEntry.ReplySourcePort = kv[1]
+	if len(kv) == 2 {
+		ctEntry.ReplySourcePort = kv[1]
+	}
 
 	kv = strings.Split(fields[replyDestinationPortIndex+shiftIndex], "=")
-	ctEntry.ReplyDestinationPort = kv[1]
+	if len(kv) == 2 {
+		ctEntry.ReplyDestinationPort = kv[1]
+	}
 
 	return ctEntry
 }
