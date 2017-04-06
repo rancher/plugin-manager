@@ -85,7 +85,7 @@ func (ctw *ConntrackTableWatcher) doSync() error {
 				continue
 			}
 		}
-		if ctEntry.ReplySourceIP != c.PrimaryIp {
+		if c.PrimaryIp != "" && ctEntry.ReplySourceIP != c.PrimaryIp {
 			logrus.Infof("conntracksync: deleting mismatching conntrack entry found: %v. [expected: %v, got: %v]", ctEntry, c.PrimaryIp, ctEntry.ReplySourceIP)
 			if err := conntrack.CTEntryDelete(ctEntry); err != nil {
 				logrus.Errorf("conntracksync: error deleting the conntrack entry: %v", err)
