@@ -108,7 +108,7 @@ func run(c *cli.Context) error {
 		logrus.Errorf("Failed to start cni config: %v", err)
 	}
 
-	if err := arpsync.Watch(c.String("arpsync-interval"), mClient); err != nil {
+	if err := arpsync.Watch(c.String("arpsync-interval"), mClient, dClient); err != nil {
 		logrus.Errorf("Failed to start arpsync: %v", err)
 	}
 

@@ -1,13 +1,16 @@
 package arpsync
 
 import (
-	"fmt"
 	"net"
 	"strconv"
 	"time"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/containernetworking/cni/pkg/ns"
+	"github.com/docker/engine-api/client"
+	"github.com/pkg/errors"
 	"github.com/rancher/go-rancher-metadata/metadata"
+	"github.com/rancher/plugin-manager/network"
 	"github.com/vishvananda/netlink"
 )
 
@@ -20,14 +23,17 @@ var (
 // and programs the appropriate ones if necessary based on info available
 // from rancher-metadata
 type ARPTableWatcher struct {
-	syncInterval time.Duration
-	mc           metadata.Client
-	lastApplied  time.Time
+	syncInterval     time.Duration
+	mc               metadata.Client
+	dc               *client.Client
+	knownRouters     map[string]metadata.Container
+	routerApplyTries int
+	lastApplied      time.Time
 }
 
 // Watch starts the go routine to periodically check the ARP table
 // for any discrepancies
-func Watch(syncIntervalStr string, mc metadata.Client) error {
+func Watch(syncIntervalStr string, mc metadata.Client, dc *client.Client) error {
 	logrus.Debugf("arpsync: syncIntervalStr: %v", syncIntervalStr)
 
 	syncInterval := DefaultSyncInterval
@@ -39,6 +45,8 @@ func Watch(syncIntervalStr string, mc metadata.Client) error {
 	atw := &ARPTableWatcher{
 		syncInterval: time.Duration(syncInterval) * time.Second,
 		mc:           mc,
+		dc:           dc,
+		knownRouters: map[string]metadata.Container{},
 	}
 
 	go mc.OnChange(120, atw.onChangeNoError)
@@ -77,58 +85,62 @@ func buildContainersMap(containers []metadata.Container,
 }
 
 func (atw *ARPTableWatcher) doSync() error {
-	logrus.Debugf("arpsync: checking the ARP table %v", time.Now())
-	networks, err := atw.mc.GetNetworks()
-	if err != nil {
-		logrus.Errorf("arpsync: error fetching networks from metadata")
-		return err
-	}
-
 	host, err := atw.mc.GetSelfHost()
 	if err != nil {
-		logrus.Errorf("arpsync: error fetching self host from metadata")
-		return err
+		return errors.Wrap(err, "get self host")
 	}
 
-	services, err := atw.mc.GetServices()
+	containers, err := atw.mc.GetContainers()
 	if err != nil {
-		logrus.Errorf("arpsync: error fetching services from metadata")
-		return err
+		return errors.Wrap(err, "error fetching containers from metadata")
 	}
 
-	var networkDriverMacAddress string
-	localNetworks := map[string]bool{}
-	for _, service := range services {
-		// Trick to select the primary service of the network plugin
-		// stack
-		// TODO: Need to check if it's needed for Calico?
-		if !(service.Kind == "networkDriverService" &&
-			service.Name == service.PrimaryServiceName) {
+	var lastError error
+	localNetworks, routers, err := network.LocalNetworks(atw.mc)
+	if err != nil {
+		return errors.Wrap(err, "get local networks")
+	}
+
+	for _, localNetwork := range localNetworks {
+		containersMap, err := buildContainersMap(containers, localNetwork)
+		if err != nil {
+			return errors.Wrap(err, "building containers map")
+		}
+
+		networkDriverMacAddress := routers[localNetwork.UUID].PrimaryMacAddress
+		if networkDriverMacAddress == "" {
 			continue
 		}
 
-		for _, aContainer := range service.Containers {
-			if aContainer.HostUUID == host.UUID {
-				networkDriverMacAddress = aContainer.PrimaryMacAddress
-				localNetworks[aContainer.NetworkUUID] = true
+		err = syncArpTable("host", networkDriverMacAddress, containersMap, host)
+		if err != nil {
+			lastError = err
+		}
+
+		if atw.knownRouters[localNetwork.UUID].PrimaryMacAddress != networkDriverMacAddress || atw.routerApplyTries < 10 {
+			if atw.knownRouters[localNetwork.UUID].PrimaryMacAddress != networkDriverMacAddress {
+				atw.routerApplyTries = 0
+			}
+
+			atw.routerApplyTries++
+			logrus.Infof("Network router changed, syncing ARP tables %d/10 in containers, new MAC: %v", atw.routerApplyTries, networkDriverMacAddress)
+			err := network.ForEachContainerNS(atw.dc, atw.mc, localNetwork.UUID, func(container metadata.Container, _ ns.NetNS) error {
+				return syncArpTable(container.ExternalId, networkDriverMacAddress, containersMap, host)
+			})
+			if err != nil {
+				lastError = err
 			}
 		}
 	}
-	if len(localNetworks) == 0 {
-		return fmt.Errorf("couldn't find any local networks")
-	}
-	logrus.Debugf("arpsync: localNetworks: %v", localNetworks)
-	logrus.Debugf("arpsync: networkDriverMacAddress=%v", networkDriverMacAddress)
 
-	var localNetwork metadata.Network
-	for _, aNetwork := range networks {
-		if _, ok := localNetworks[aNetwork.UUID]; ok {
-			localNetwork = aNetwork
-			break
-		}
+	if lastError == nil {
+		atw.knownRouters = routers
 	}
-	logrus.Debugf("arpsync: localNetwork: %+v", localNetwork)
 
+	return lastError
+}
+
+func syncArpTable(context string, networkDriverMacAddress string, containersMap map[string]*metadata.Container, host metadata.Host) error {
 	// Read the ARP table
 	entries, err := netlink.NeighList(0, netlink.FAMILY_V4)
 	if err != nil {
@@ -137,25 +149,16 @@ func (atw *ARPTableWatcher) doSync() error {
 	}
 	logrus.Debugf("arpsync: entries=%+v", entries)
 
-	containers, err := atw.mc.GetContainers()
-	if err != nil {
-		logrus.Errorf("arpsync: error fetching containers from metadata")
-		return err
-	}
-	containersMap, err := buildContainersMap(containers, localNetwork)
-
 	for _, aEntry := range entries {
 		if container, found := containersMap[aEntry.IP.String()]; found {
+			expected := networkDriverMacAddress
 			if container.HostUUID == host.UUID {
-				if container.PrimaryMacAddress != aEntry.HardwareAddr.String() {
-					logrus.Infof("arpsync: wrong ARP entry found=%+v(expected: %v) for local container, fixing it", aEntry, container.PrimaryMacAddress)
-					fixARPEntry(aEntry, container.PrimaryMacAddress)
-				}
-			} else {
-				if aEntry.HardwareAddr.String() != networkDriverMacAddress {
-					logrus.Errorf("arpsync: wrong ARP entry found=%+v(expected: %v) for remote container, fixing it", aEntry, networkDriverMacAddress)
-					fixARPEntry(aEntry, networkDriverMacAddress)
-				}
+				expected = container.PrimaryMacAddress
+			}
+
+			if aEntry.HardwareAddr.String() != expected {
+				logrus.Infof("arpsync: (%s) wrong ARP entry found=%+v(expected: %v) for local container, fixing it", context, aEntry, expected)
+				fixARPEntry(aEntry, expected)
 			}
 		} else {
 			logrus.Debugf("arpsync: container not found for ARP entry: %+v", aEntry)
