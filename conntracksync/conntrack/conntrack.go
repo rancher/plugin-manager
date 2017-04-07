@@ -23,24 +23,6 @@ type CTEntry struct {
 	ReplyDestinationPort    string
 }
 
-// Example:
-// tcp      6 431999 ESTABLISHED src=172.17.0.2 dst=172.22.101.201 sport=43009 dport=8080 src=172.22.101.201 dst=172.22.101.101 sport=8080 dport=43009 [ASSURED] mark=0 use=1
-//udp      17 173 src=10.49.61.42 dst=172.22.101.102 sport=4500 dport=4500 src=172.22.101.102 dst=172.22.101.101 sport=4500 dport=4500 [ASSURED] mark=0 use=1
-// tcp      6 65 TIME_WAIT src=172.22.101.1 dst=172.22.101.101 sport=59032 dport=9901 src=10.49.205.140 dst=172.22.101.1 sport=80 dport=59032 [ASSURED] mark=0 use=1
-// [ASSURED] or [UNREPLIED] can be present after the original IP/Port info
-// need to account for that
-const (
-	protocolIndex                = 0
-	originalSourceIPIndex        = 3
-	originalDestinationIPIndex   = 4
-	originalSourcePortIndex      = 5
-	originalDestinationPortIndex = 6
-	replySourceIPIndex           = 7
-	replyDestinationIPIndex      = 8
-	replySourcePortIndex         = 9
-	replyDestinationPortIndex    = 10
-)
-
 // ListDNAT lists only DNAT conntrack entries
 func ListDNAT() ([]CTEntry, error) {
 	return cmdCTListDNAT()
