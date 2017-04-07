@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"strings"
 	"time"
 
 	"github.com/Sirupsen/logrus"
@@ -20,9 +21,9 @@ type MACSyncer struct {
 }
 
 var (
-	syncInterval = 5 * time.Second
+	syncInterval = 15 * time.Second
 	// N for 2 min
-	N = 24
+	N = 8
 )
 
 // SyncMACAddresses syncs the MAC addresses of all the running
@@ -125,19 +126,21 @@ func (ms *MACSyncer) doSync() error {
 		netns, err := ns.GetNS(containerNSStr)
 		if err != nil {
 			logrus.Errorf("macsync: failed to open netns %v: %v", containerNSStr, err)
-			return err
+			continue
 		}
 		defer netns.Close()
 
 		if err := netns.Do(func(_ ns.NetNS) error {
 			l, err := netlink.LinkByName("eth0")
 			if err != nil {
-				logrus.Errorf("macsync: for container: %v, could not lookup interface: %v", aContainer, err)
+				logrus.Errorf("macsync: for container: %v, could not lookup interface: %v",
+					aContainer, err)
 				return err
 			}
 			foundMAC := l.Attrs().HardwareAddr.String()
-			if aContainer.PrimaryMacAddress != foundMAC {
-				logrus.Infof("macsync: fixing container %v MAC address, found=%v, expected: %v", aContainer.ExternalId, foundMAC, aContainer.PrimaryMacAddress)
+			if !strings.EqualFold(aContainer.PrimaryMacAddress, foundMAC) {
+				logrus.Infof("macsync: fixing container %v MAC address, found=%v, expected: %v",
+					aContainer.ExternalId, foundMAC, aContainer.PrimaryMacAddress)
 
 				hwaddr, err := net.ParseMAC(aContainer.PrimaryMacAddress)
 				if err != nil {
@@ -151,7 +154,7 @@ func (ms *MACSyncer) doSync() error {
 			return nil
 		}); err != nil {
 			logrus.Errorf("macsync: err=%v", err)
-			return err
+			continue
 		}
 	}
 	return nil
