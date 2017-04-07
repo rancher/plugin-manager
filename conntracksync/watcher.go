@@ -85,7 +85,7 @@ func (ctw *ConntrackTableWatcher) doSync() error {
 				continue
 			}
 		}
-		if ctEntry.ReplySourceIP != c.PrimaryIp {
+		if c.PrimaryIp != "" && ctEntry.ReplySourceIP != c.PrimaryIp {
 			logrus.Infof("conntracksync: deleting mismatching conntrack entry found: %v. [expected: %v, got: %v]", ctEntry, c.PrimaryIp, ctEntry.ReplySourceIP)
 			if err := conntrack.CTEntryDelete(ctEntry); err != nil {
 				logrus.Errorf("conntracksync: error deleting the conntrack entry: %v", err)
@@ -116,13 +116,18 @@ func (ctw *ConntrackTableWatcher) buildContainersMaps() (
 		}
 
 		for _, aPort := range aContainer.Ports {
+			protocol := "tcp"
 			splits := strings.Split(aPort, ":")
 			if len(splits) != 3 {
 				continue
 			}
 			hostIP := splits[0]
 			hostPort := splits[1]
-			protocol := strings.Split(splits[2], "/")[1]
+			targetPort := splits[2]
+			parts := strings.Split(targetPort, "/")
+			if len(parts) == 2 {
+				protocol = parts[1]
+			}
 
 			containersMap[hostIP+":"+hostPort+"/"+protocol] = &containers[index]
 		}

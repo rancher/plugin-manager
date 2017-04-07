@@ -15,6 +15,7 @@ import (
 	"github.com/rancher/plugin-manager/events"
 	"github.com/rancher/plugin-manager/hostnat"
 	"github.com/rancher/plugin-manager/hostports"
+	"github.com/rancher/plugin-manager/macsync"
 	"github.com/rancher/plugin-manager/network"
 	"github.com/rancher/plugin-manager/reaper"
 	"github.com/rancher/plugin-manager/routesync"
@@ -79,6 +80,8 @@ func run(c *cli.Context) error {
 	if err != nil {
 		return errors.Wrap(err, "Creating metadata client")
 	}
+
+	macsync.SyncMACAddresses(mClient, dClient)
 
 	manager, err := network.NewManager(dClient)
 	if err != nil {

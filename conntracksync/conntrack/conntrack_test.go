@@ -40,7 +40,7 @@ func TestCTEntryCreateDelete(t *testing.T) {
 	var err error
 	testEntry := "tcp      6 65 TIME_WAIT src=172.22.101.1 dst=172.22.101.101 sport=59032 dport=9901 src=10.49.205.140 dst=172.22.101.1 sport=80 dport=59032 [ASSURED] mark=0 use=1"
 
-	e := parseOneConntrackEntry(testEntry)
+	e, _ := parseOneConntrackEntry(testEntry)
 
 	err = CTEntryCreate(e)
 	if err != nil {

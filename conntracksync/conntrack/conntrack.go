@@ -1,7 +1,7 @@
 package conntrack
 
 import (
-	//"fmt"
+	"fmt"
 	"os"
 	"os/exec"
 	"strings"
@@ -23,24 +23,6 @@ type CTEntry struct {
 	ReplyDestinationPort    string
 }
 
-// Example:
-// tcp      6 431999 ESTABLISHED src=172.17.0.2 dst=172.22.101.201 sport=43009 dport=8080 src=172.22.101.201 dst=172.22.101.101 sport=8080 dport=43009 [ASSURED] mark=0 use=1
-//udp      17 173 src=10.49.61.42 dst=172.22.101.102 sport=4500 dport=4500 src=172.22.101.102 dst=172.22.101.101 sport=4500 dport=4500 [ASSURED] mark=0 use=1
-// tcp      6 65 TIME_WAIT src=172.22.101.1 dst=172.22.101.101 sport=59032 dport=9901 src=10.49.205.140 dst=172.22.101.1 sport=80 dport=59032 [ASSURED] mark=0 use=1
-// [ASSURED] or [UNREPLIED] can be present after the original IP/Port info
-// need to account for that
-const (
-	protocolIndex                = 0
-	originalSourceIPIndex        = 3
-	originalDestinationIPIndex   = 4
-	originalSourcePortIndex      = 5
-	originalDestinationPortIndex = 6
-	replySourceIPIndex           = 7
-	replyDestinationIPIndex      = 8
-	replySourcePortIndex         = 9
-	replyDestinationPortIndex    = 10
-)
-
 // ListDNAT lists only DNAT conntrack entries
 func ListDNAT() ([]CTEntry, error) {
 	return cmdCTListDNAT()
@@ -60,10 +42,10 @@ func CTEntryCreate(e CTEntry) error {
 		"--reply-port-src", e.ReplySourcePort,
 		"--reply-port-dst", e.ReplyDestinationPort,
 		"--timeout", "120",
-		"--state", "ESTABILISHED",
+		"--state", "ESTABLISHED",
 	)
 	if err := cmd.Run(); err != nil {
-		logrus.Errorf("error adding conntrack entry")
+		logrus.Errorf("error adding conntrack entry: %v", err)
 		return err
 	}
 	return nil
@@ -83,7 +65,7 @@ func CTEntryDelete(e CTEntry) error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
-		logrus.Errorf("error deleting conntrack entry")
+		logrus.Errorf("error deleting conntrack entry: %v", err)
 		return err
 	}
 	return nil
@@ -108,55 +90,58 @@ func parseMultipleEntries(input string) []CTEntry {
 		if line == "" {
 			continue
 		}
-		e := parseOneConntrackEntry(line)
+		e, err := parseOneConntrackEntry(line)
+		if err != nil {
+			continue
+		}
 		entries = append(entries, e)
 	}
 
 	return entries
 }
 
-func parseOneConntrackEntry(e string) CTEntry {
-	shiftIndex := 0
+func parseOneConntrackEntry(e string) (CTEntry, error) {
+	logrus.Debugf("conntrack: parsing conntrack entry: %v", e)
 	ctEntry := CTEntry{}
 
+	original := make(map[string]string)
+	reply := make(map[string]string)
 	fields := strings.Fields(e)
 
-	ctEntry.Protocol = fields[protocolIndex]
-
-	// if protocol is tcp, there is a different column, need to shift
-	if ctEntry.Protocol == "tcp" {
-		shiftIndex++
+	if len(fields) < 4 {
+		return ctEntry, fmt.Errorf("conntrack: invalid entry")
 	}
 
-	kv := strings.Split(fields[originalSourceIPIndex+shiftIndex], "=")
-	ctEntry.OriginalSourceIP = kv[1]
+	protocol := fields[0]
 
-	kv = strings.Split(fields[originalDestinationIPIndex+shiftIndex], "=")
-	ctEntry.OriginalDestinationIP = kv[1]
+	for _, field := range fields[3:] {
+		if !(field == "[UNREPLIED]" || field == "[ASSURED]") {
+			kv := strings.Split(field, "=")
+			if len(kv) != 2 {
+				continue
+			}
+			_, ok := original[kv[0]]
 
-	kv = strings.Split(fields[originalSourcePortIndex+shiftIndex], "=")
-	ctEntry.OriginalSourcePort = kv[1]
+			var m map[string]string
+			if ok {
+				m = reply
+			} else {
+				m = original
+			}
 
-	kv = strings.Split(fields[originalDestinationPortIndex+shiftIndex], "=")
-	ctEntry.OriginalDestinationPort = kv[1]
-
-	// Check if [UNREPLIED] or someother word is present
-	// and shift the index if needed
-	if fields[originalDestinationPortIndex+shiftIndex+1][0] == "["[0] {
-		shiftIndex++
+			m[kv[0]] = kv[1]
+		}
 	}
 
-	kv = strings.Split(fields[replySourceIPIndex+shiftIndex], "=")
-	ctEntry.ReplySourceIP = kv[1]
+	ctEntry.Protocol = protocol
+	ctEntry.OriginalSourceIP = original["src"]
+	ctEntry.OriginalDestinationIP = original["dst"]
+	ctEntry.OriginalSourcePort = original["sport"]
+	ctEntry.OriginalDestinationPort = original["dport"]
+	ctEntry.ReplySourceIP = reply["src"]
+	ctEntry.ReplyDestinationIP = reply["dst"]
+	ctEntry.ReplySourcePort = reply["sport"]
+	ctEntry.ReplyDestinationPort = reply["dport"]
 
-	kv = strings.Split(fields[replyDestinationIPIndex+shiftIndex], "=")
-	ctEntry.ReplyDestinationIP = kv[1]
-
-	kv = strings.Split(fields[replySourcePortIndex+shiftIndex], "=")
-	ctEntry.ReplySourcePort = kv[1]
-
-	kv = strings.Split(fields[replyDestinationPortIndex+shiftIndex], "=")
-	ctEntry.ReplyDestinationPort = kv[1]
-
-	return ctEntry
+	return ctEntry, nil
 }
