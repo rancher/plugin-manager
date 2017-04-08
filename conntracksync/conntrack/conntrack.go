@@ -23,6 +23,11 @@ type CTEntry struct {
 	ReplyDestinationPort    string
 }
 
+// ListSNAT lists only SNAT conntrack entries
+func ListSNAT() ([]CTEntry, error) {
+	return cmdCTListSNAT()
+}
+
 // ListDNAT lists only DNAT conntrack entries
 func ListDNAT() ([]CTEntry, error) {
 	return cmdCTListDNAT()
@@ -69,6 +74,19 @@ func CTEntryDelete(e CTEntry) error {
 		return err
 	}
 	return nil
+}
+
+func cmdCTListSNAT() ([]CTEntry, error) {
+	out, err := exec.Command("conntrack", "-n", "-L").Output()
+	if err != nil {
+		logrus.Errorf("error getting SNAT conntrack entries")
+		return nil, err
+	}
+
+	if len(out) == 0 {
+		return nil, nil
+	}
+	return parseMultipleEntries(string(out)), nil
 }
 
 func cmdCTListDNAT() ([]CTEntry, error) {
