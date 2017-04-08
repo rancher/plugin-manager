@@ -102,10 +102,10 @@ func (ctw *ConntrackTableWatcher) doSync() error {
 	for _, ctEntry := range sCTEntries {
 		var c *metadata.Container
 		var specificEntryFound, genericEntryFound bool
-		specificKey := ctEntry.ReplyDestinationIP + ":" + ctEntry.OriginalSourcePort + "/" + ctEntry.Protocol
+		specificKey := ctEntry.ReplyDestinationIP + ":" + ctEntry.ReplyDestinationPort + "/" + ctEntry.Protocol
 		c, specificEntryFound = containersMap[specificKey]
 		if !specificEntryFound {
-			genericKey := "0.0.0.0:" + ctEntry.OriginalSourcePort + "/" + ctEntry.Protocol
+			genericKey := "0.0.0.0:" + ctEntry.ReplyDestinationPort + "/" + ctEntry.Protocol
 			c, genericEntryFound = containersMap[genericKey]
 			if !genericEntryFound {
 				continue
