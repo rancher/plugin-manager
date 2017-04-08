@@ -22,6 +22,7 @@ type MACSyncer struct {
 }
 
 var (
+	syncLabel    = "io.rancher.network.macsync"
 	syncInterval = 15 * time.Second
 	// N for 2 min
 	N = 8
@@ -37,8 +38,13 @@ func SyncMACAddresses(mc metadata.Client, dockerClient *client.Client) {
 		dc: dockerClient,
 	}
 
-	if err := ms.doSync(); err != nil {
-		logrus.Errorf("macsync: error syncing MAC addresses for the first tiime: %v", err)
+	for {
+		if done, err := ms.doSync(); err != nil {
+			logrus.Errorf("macsync: error syncing MAC addresses for the first tiime: %v", err)
+		} else if done {
+			break
+		}
+		time.Sleep(syncInterval)
 	}
 
 	go ms.syncNTimes()
@@ -47,20 +53,27 @@ func SyncMACAddresses(mc metadata.Client, dockerClient *client.Client) {
 func (ms *MACSyncer) syncNTimes() {
 	for i := 0; i < N; i++ {
 		time.Sleep(syncInterval)
-		if err := ms.doSync(); err != nil {
+		if _, err := ms.doSync(); err != nil {
 			logrus.Errorf("macsync: i: %v, error syncing MAC addresses: %v", i, err)
 		}
 	}
 }
 
-func (ms *MACSyncer) doSync() error {
-	networks, _, err := network.LocalNetworks(ms.mc)
+func (ms *MACSyncer) doSync() (bool, error) {
+	didSomething := false
+
+	networks, routers, err := network.LocalNetworks(ms.mc)
 	if err != nil {
-		return errors.Wrap(err, "getting local networks")
+		return didSomething, errors.Wrap(err, "getting local networks")
 	}
 
 	var lastError error
 	for _, n := range networks {
+		if routers[n.UUID].Labels[syncLabel] != "true" {
+			continue
+		}
+
+		didSomething = true
 		err := network.ForEachContainerNS(ms.dc, ms.mc, n.UUID, func(aContainer metadata.Container, _ ns.NetNS) error {
 			l, err := netlink.LinkByName("eth0")
 			if err != nil {
@@ -89,5 +102,5 @@ func (ms *MACSyncer) doSync() error {
 		}
 	}
 
-	return lastError
+	return didSomething, lastError
 }

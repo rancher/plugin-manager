@@ -17,6 +17,7 @@ import (
 var (
 	// DefaultSyncInterval specifies the default value for arpsync interval in seconds
 	DefaultSyncInterval = 5
+	syncLabel           = "io.rancher.network.arpsync"
 )
 
 // ARPTableWatcher checks the ARP table periodically for invalid entries
@@ -102,6 +103,10 @@ func (atw *ARPTableWatcher) doSync() error {
 	}
 
 	for _, localNetwork := range localNetworks {
+		if routers[localNetwork.UUID].Labels[syncLabel] != "true" {
+			continue
+		}
+
 		containersMap, err := buildContainersMap(containers, localNetwork)
 		if err != nil {
 			return errors.Wrap(err, "building containers map")
