@@ -67,13 +67,13 @@ func (ctw *ConntrackTableWatcher) doSync() error {
 		return err
 	}
 
-	ctEntries, err := conntrack.ListDNAT()
+	dCTEntries, err := conntrack.ListDNAT()
 	if err != nil {
-		logrus.Errorf("conntracksync: error fetching conntrack entries")
+		logrus.Errorf("conntracksync: error fetching DNAT conntrack entries")
 		return err
 	}
 
-	for _, ctEntry := range ctEntries {
+	for _, ctEntry := range dCTEntries {
 		var c *metadata.Container
 		var specificEntryFound, genericEntryFound bool
 		specificKey := ctEntry.OriginalDestinationIP + ":" + ctEntry.OriginalDestinationPort + "/" + ctEntry.Protocol
@@ -86,7 +86,33 @@ func (ctw *ConntrackTableWatcher) doSync() error {
 			}
 		}
 		if c.PrimaryIp != "" && ctEntry.ReplySourceIP != c.PrimaryIp {
-			logrus.Infof("conntracksync: deleting mismatching conntrack entry found: %v. [expected: %v, got: %v]", ctEntry, c.PrimaryIp, ctEntry.ReplySourceIP)
+			logrus.Infof("conntracksync: deleting mismatching DNAT conntrack entry found: %v. [expected: %v, got: %v]", ctEntry, c.PrimaryIp, ctEntry.ReplySourceIP)
+			if err := conntrack.CTEntryDelete(ctEntry); err != nil {
+				logrus.Errorf("conntracksync: error deleting the conntrack entry: %v", err)
+			}
+		}
+	}
+
+	sCTEntries, err := conntrack.ListSNAT()
+	if err != nil {
+		logrus.Errorf("conntracksync: error fetching SNAT conntrack entries")
+		return err
+	}
+
+	for _, ctEntry := range sCTEntries {
+		var c *metadata.Container
+		var specificEntryFound, genericEntryFound bool
+		specificKey := ctEntry.ReplyDestinationIP + ":" + ctEntry.OriginalSourcePort + "/" + ctEntry.Protocol
+		c, specificEntryFound = containersMap[specificKey]
+		if !specificEntryFound {
+			genericKey := "0.0.0.0:" + ctEntry.OriginalSourcePort + "/" + ctEntry.Protocol
+			c, genericEntryFound = containersMap[genericKey]
+			if !genericEntryFound {
+				continue
+			}
+		}
+		if c.PrimaryIp != "" && ctEntry.OriginalSourceIP != c.PrimaryIp {
+			logrus.Infof("conntracksync: deleting mismatching SNAT conntrack entry found: %v. [expected: %v, got: %v]", ctEntry, c.PrimaryIp, ctEntry.OriginalSourceIP)
 			if err := conntrack.CTEntryDelete(ctEntry); err != nil {
 				logrus.Errorf("conntracksync: error deleting the conntrack entry: %v", err)
 			}
