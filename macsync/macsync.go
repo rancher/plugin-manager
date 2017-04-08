@@ -38,6 +38,10 @@ func SyncMACAddresses(mc metadata.Client, dockerClient *client.Client) {
 		dc: dockerClient,
 	}
 
+	go ms.syncNTimes()
+}
+
+func (ms *MACSyncer) syncNTimes() {
 	for {
 		if done, err := ms.doSync(); err != nil {
 			logrus.Errorf("macsync: error syncing MAC addresses for the first tiime: %v", err)
@@ -47,10 +51,6 @@ func SyncMACAddresses(mc metadata.Client, dockerClient *client.Client) {
 		time.Sleep(syncInterval)
 	}
 
-	go ms.syncNTimes()
-}
-
-func (ms *MACSyncer) syncNTimes() {
 	for i := 0; i < N; i++ {
 		time.Sleep(syncInterval)
 		if _, err := ms.doSync(); err != nil {
