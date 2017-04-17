@@ -146,8 +146,17 @@ func (atw *ARPTableWatcher) doSync() error {
 }
 
 func syncArpTable(context string, networkDriverMacAddress string, containersMap map[string]*metadata.Container, host metadata.Host) error {
+	linkIndex := 0
+	if context != "host" {
+		link, err := netlink.LinkByName("eth0")
+		if err != nil {
+			logrus.Errorf("arpsync: error fetching eth0 link for %v: %v", context, err)
+			return err
+		}
+		linkIndex = link.Attrs().Index
+	}
 	// Read the ARP table
-	entries, err := netlink.NeighList(0, netlink.FAMILY_V4)
+	entries, err := netlink.NeighList(linkIndex, netlink.FAMILY_V4)
 	if err != nil {
 		logrus.Errorf("arpsync: error fetching entries from ARP table")
 		return err
