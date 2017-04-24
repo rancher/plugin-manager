@@ -56,29 +56,10 @@ func (w *watcher) onChange(version string) error {
 		return err
 	}
 
-	services, err := w.c.GetServices()
-	if err != nil {
-		return err
-	}
-
-	localNetworks := map[string]bool{}
-	for _, service := range services {
-		if service.Kind != "networkDriverService" {
-			continue
-		}
-
-		for _, aContainer := range service.Containers {
-			if aContainer.HostUUID == host.UUID {
-				localNetworks[aContainer.NetworkUUID] = true
-			}
-		}
-	}
-	logrus.Debugf("localNetworks: %v", localNetworks)
-
 	forceApply := time.Now().Sub(w.lastApplied) > reapplyEvery
 
 	for _, network := range networks {
-		if _, local := localNetworks[network.UUID]; !local {
+		if network.EnvironmentUUID != host.EnvironmentUUID {
 			logrus.Debugf("network: %v is not local to this environment", network.UUID)
 			continue
 		}
