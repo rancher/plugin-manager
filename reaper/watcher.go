@@ -37,7 +37,7 @@ func watchMetadata(dockerClient *client.Client) {
 		Factor: 1.5,
 	}
 	for {
-		err := CheckMetadata(dockerClient, false)
+		err := CheckMetadata(dockerClient)
 		if err != nil {
 			logrus.Errorf("Failed to check for bad metadata: %v", err)
 		}
@@ -84,7 +84,7 @@ func (w *watcher) onChange(version string) error {
 	return nil
 }
 
-func CheckMetadata(dockerClient *client.Client, first bool) error {
+func CheckMetadata(dockerClient *client.Client) error {
 	containers, err := dockerClient.ContainerList(context.Background(), types.ContainerListOptions{
 		All: true,
 	})
@@ -95,6 +95,10 @@ func CheckMetadata(dockerClient *client.Client, first bool) error {
 	metadataIds := []string{}
 	dnsIds := []string{}
 	for _, container := range containers {
+		if container.State != "running" {
+			continue
+		}
+
 		if container.Labels[uuidLabel] != "" && container.Labels[serviceNameLabel] == metadataService {
 			metadataIds = append(metadataIds, container.ID)
 		}
@@ -103,33 +107,21 @@ func CheckMetadata(dockerClient *client.Client, first bool) error {
 		}
 	}
 
-	toDelete := []string{}
+	toStop := []string{}
 
+	// Lists are ordered newest to older so we pick the last to stop
 	if len(metadataIds) > 1 {
-		toDelete = append(toDelete, metadataIds...)
-		toDelete = append(toDelete, dnsIds...)
-	} else if len(dnsIds) > 1 {
-		toDelete = append(toDelete, dnsIds...)
-	} else if first && len(dnsIds) == 1 {
-		dnsContainer, err := dockerClient.ContainerInspect(context.Background(), dnsIds[0])
-		if err != nil {
-			return err
-		}
-		id := dnsContainer.HostConfig.NetworkMode.ConnectedContainer()
-		_, err = dockerClient.ContainerInspect(context.Background(), id)
-		if client.IsErrContainerNotFound(err) {
-			logrus.Errorf("Failed to find network container [%s] for DNS %s", id, dnsIds[0])
-			toDelete = append(toDelete, dnsIds...)
-		}
+		toStop = append(toStop, metadataIds[len(metadataIds)-1])
+	}
+	if len(dnsIds) > 1 {
+		toStop = append(toStop, dnsIds[len(dnsIds)-1])
 	}
 
-	for _, id := range toDelete {
-		logrus.Infof("Deleting duplicate metadata/dns service: %s", id)
-		err := dockerClient.ContainerRemove(context.Background(), id, types.ContainerRemoveOptions{
-			Force: true,
-		})
-		if err != nil {
-			logrus.Errorf("Failed to remove duplicate metadata/dns service: %s", id)
+	for _, id := range toStop {
+		logrus.Infof("Stopping duplicate metadata/dns service: %s", id)
+		t := time.Duration(0)
+		if err := dockerClient.ContainerStop(context.Background(), id, &t); err != nil {
+			logrus.Errorf("Failed to stop duplicate metadata/dns service: %s", id)
 		}
 	}
 

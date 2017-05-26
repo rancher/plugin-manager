@@ -73,7 +73,7 @@ func run(c *cli.Context) error {
 		return err
 	}
 
-	reaper.CheckMetadata(dClient, true)
+	reaper.CheckMetadata(dClient)
 
 	logrus.Infof("Waiting for metadata")
 	mClient, err := metadata.NewClientAndWait(c.String("metadata-url"))
