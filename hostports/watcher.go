@@ -54,7 +54,6 @@ type PortRule struct {
 
 func (p PortRule) prefix() []byte {
 	buf := &bytes.Buffer{}
-	buf.WriteString("-A CATTLE_PREROUTING")
 	if p.Bridge != "" {
 		buf.WriteString(" ! -i ")
 		buf.WriteString(p.Bridge)
@@ -70,16 +69,23 @@ func (p PortRule) prefix() []byte {
 	return buf.Bytes()
 }
 
-func (p PortRule) iptables() []byte {
+func (p PortRule) rawIptables() []byte {
 	// Rules like
 	// -A CATTLE_PREROUTING -p ${protocol} --dport ${sourcePort} -j MARK --set-mark 4200
-	// -A CATTLE_PREROUTING -p ${protocol} --dport ${sourcePort} -j DNAT --to ${targetIP}:${targetPort}
 	// We use mark 4200.  It is important whatever mark we use that the 0x8000 and 0x4000 bits are unset.
 	// Those bits are used by k8s and will conflict.
 	buf := &bytes.Buffer{}
+	buf.WriteString("-A CATTLE_RAW_PREROUTING")
 	buf.Write(p.prefix())
 	buf.WriteString(" -j MARK --set-mark 4200\n")
+	return buf.Bytes()
+}
 
+func (p PortRule) natIptables() []byte {
+	// Rules like
+	// -A CATTLE_PREROUTING -p ${protocol} --dport ${sourcePort} -j DNAT --to ${targetIP}:${targetPort}
+	buf := &bytes.Buffer{}
+	buf.WriteString("-A CATTLE_PREROUTING")
 	buf.Write(p.prefix())
 	buf.WriteString(" -j DNAT --to ")
 	buf.WriteString(p.TargetIP)
@@ -104,6 +110,9 @@ func (p PortRule) iptables() []byte {
 }
 
 func (w *watcher) insertBaseRules() error {
+	if w.run("iptables", "-w", "-t", "raw", "-C", "PREROUTING", "-m", "addrtype", "--dst-type", "LOCAL", "-j", "CATTLE_RAW_PREROUTING") != nil {
+		return w.run("iptables", "-w", "-t", "raw", "-I", "PREROUTING", "-m", "addrtype", "--dst-type", "LOCAL", "-j", "CATTLE_RAW_PREROUTING")
+	}
 	if w.run("iptables", "-w", "-t", "nat", "-C", "PREROUTING", "-m", "addrtype", "--dst-type", "LOCAL", "-j", "CATTLE_PREROUTING") != nil {
 		return w.run("iptables", "-w", "-t", "nat", "-I", "PREROUTING", "-m", "addrtype", "--dst-type", "LOCAL", "-j", "CATTLE_PREROUTING")
 	}
@@ -201,6 +210,15 @@ func (w *watcher) onChange(version string) error {
 
 func (w *watcher) apply(rules map[string]PortRule) error {
 	buf := &bytes.Buffer{}
+	buf.WriteString("*raw\n")
+	buf.WriteString(":CATTLE_RAW_PREROUTING -\n")
+	buf.WriteString("-F CATTLE_RAW_PREROUTING\n")
+	for _, rule := range rules {
+		buf.WriteString("\n")
+		buf.Write(rule.rawIptables())
+	}
+	buf.WriteString("\nCOMMIT\n")
+
 	// NOTE: We don't use CATTLE_POSTROUTING, but for migration we just wipe it out
 	buf.WriteString("*nat\n")
 	buf.WriteString(":CATTLE_PREROUTING -\n")
@@ -213,7 +231,7 @@ func (w *watcher) apply(rules map[string]PortRule) error {
 	buf.WriteString(fmt.Sprintf("-F %s\n", hostPortsPostRoutingChain))
 	for _, rule := range rules {
 		buf.WriteString("\n")
-		buf.Write(rule.iptables())
+		buf.Write(rule.natIptables())
 	}
 
 	buf.WriteString("\nCOMMIT\n\n*filter\n:CATTLE_FORWARD -\n")
