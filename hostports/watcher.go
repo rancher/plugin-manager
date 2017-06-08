@@ -110,22 +110,33 @@ func (p PortRule) natIptables() []byte {
 }
 
 func (w *watcher) insertBaseRules() error {
+	var e error
 	if w.run("iptables", "-w", "-t", "raw", "-C", "PREROUTING", "-m", "addrtype", "--dst-type", "LOCAL", "-j", "CATTLE_RAW_PREROUTING") != nil {
-		return w.run("iptables", "-w", "-t", "raw", "-I", "PREROUTING", "-m", "addrtype", "--dst-type", "LOCAL", "-j", "CATTLE_RAW_PREROUTING")
+		if err := w.run("iptables", "-w", "-t", "raw", "-I", "PREROUTING", "-m", "addrtype", "--dst-type", "LOCAL", "-j", "CATTLE_RAW_PREROUTING"); err != nil {
+			e = errors.Wrap(e, err.Error())
+		}
 	}
 	if w.run("iptables", "-w", "-t", "nat", "-C", "PREROUTING", "-m", "addrtype", "--dst-type", "LOCAL", "-j", "CATTLE_PREROUTING") != nil {
-		return w.run("iptables", "-w", "-t", "nat", "-I", "PREROUTING", "-m", "addrtype", "--dst-type", "LOCAL", "-j", "CATTLE_PREROUTING")
+		if err := w.run("iptables", "-w", "-t", "nat", "-I", "PREROUTING", "-m", "addrtype", "--dst-type", "LOCAL", "-j", "CATTLE_PREROUTING"); err != nil {
+			e = errors.Wrap(e, err.Error())
+		}
 	}
 	if w.run("iptables", "-w", "-C", "FORWARD", "-j", "CATTLE_FORWARD") != nil {
-		return w.run("iptables", "-w", "-I", "FORWARD", "-j", "CATTLE_FORWARD")
+		if err := w.run("iptables", "-w", "-I", "FORWARD", "-j", "CATTLE_FORWARD"); err != nil {
+			e = errors.Wrap(e, err.Error())
+		}
 	}
 	if w.run("iptables", "-w", "-t", "nat", "-C", "OUTPUT", "-m", "addrtype", "--dst-type", "LOCAL", "-j", "CATTLE_OUTPUT") != nil {
-		return w.run("iptables", "-w", "-t", "nat", "-I", "OUTPUT", "-m", "addrtype", "--dst-type", "LOCAL", "-j", "CATTLE_OUTPUT")
+		if err := w.run("iptables", "-w", "-t", "nat", "-I", "OUTPUT", "-m", "addrtype", "--dst-type", "LOCAL", "-j", "CATTLE_OUTPUT"); err != nil {
+			e = errors.Wrap(e, err.Error())
+		}
 	}
 	if w.run("iptables", "-w", "-t", "nat", "-C", "POSTROUTING", "-j", hostPortsPostRoutingChain) != nil {
-		return w.run("iptables", "-w", "-t", "nat", "-I", "POSTROUTING", "-j", hostPortsPostRoutingChain)
+		if err := w.run("iptables", "-w", "-t", "nat", "-I", "POSTROUTING", "-j", hostPortsPostRoutingChain); err != nil {
+			e = errors.Wrap(e, err.Error())
+		}
 	}
-	return nil
+	return e
 }
 
 func (w *watcher) run(args ...string) error {
