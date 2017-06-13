@@ -19,6 +19,7 @@ import (
 	"github.com/rancher/plugin-manager/network"
 	"github.com/rancher/plugin-manager/reaper"
 	"github.com/rancher/plugin-manager/routesync"
+	"github.com/rancher/plugin-manager/vethsync"
 	"github.com/urfave/cli"
 )
 
@@ -47,6 +48,11 @@ func main() {
 		cli.StringFlag{
 			Name:  "arpsync-interval",
 			Usage: fmt.Sprintf("Customize the interval of arpsync in seconds (default: %v)", arpsync.DefaultSyncInterval),
+			Value: "",
+		},
+		cli.StringFlag{
+			Name:  "vethsync-interval",
+			Usage: fmt.Sprintf("Customize the interval of vethsync in seconds (default: %v)", vethsync.DefaultSyncInterval),
 			Value: "",
 		},
 		cli.BoolFlag{
@@ -110,6 +116,10 @@ func run(c *cli.Context) error {
 
 	if err := arpsync.Watch(c.String("arpsync-interval"), mClient, dClient); err != nil {
 		logrus.Errorf("Failed to start arpsync: %v", err)
+	}
+
+	if err := vethsync.Watch(c.String("vethsync-interval"), mClient, dClient); err != nil {
+		logrus.Errorf("Failed to start vethsync: %v", err)
 	}
 
 	binWatcher := binexec.Watch(mClient, dClient)
