@@ -1,7 +1,6 @@
 package vethsync
 
 import (
-	"encoding/json"
 	"testing"
 
 	"github.com/Sirupsen/logrus"
@@ -13,6 +12,26 @@ import (
 // remember to disable this before commiting the code.
 const inDevelopment = false
 
+func getTestVethWatcher() (*VethWatcher, error) {
+	metadataURL := "http://169.254.169.250/2016-07-29"
+	mc, err := metadata.NewClientAndWait(metadataURL)
+	if err != nil {
+		logrus.Errorf("error creating metadata client")
+		return nil, err
+	}
+	dClient, err := client.NewEnvClient()
+	if err != nil {
+		logrus.Errorf("err=%v", err)
+		return nil, err
+	}
+	return &VethWatcher{
+		mc:          mc,
+		metadataURL: metadataURL,
+		dc:          dClient,
+		debug:       true,
+	}, nil
+}
+
 func TestDoSync(t *testing.T) {
 	if !inDevelopment {
 		t.Skip("not in development mode")
@@ -20,58 +39,12 @@ func TestDoSync(t *testing.T) {
 	logrus.SetLevel(logrus.DebugLevel)
 	logrus.Debugf("TestDoSync")
 
-	mc, err := metadata.NewClientAndWait("http://169.254.169.250/2016-07-29")
+	vw, err := getTestVethWatcher()
 	if err != nil {
-		logrus.Errorf("error creating metadata client")
-		t.Fail()
+		t.Fatalf("not expecting error: %v", err)
 	}
-	dClient, err := client.NewEnvClient()
-	if err != nil {
-		logrus.Errorf("err=%v", err)
-		t.Fail()
+	if err := vw.doSync(); err != nil {
+		logrus.Errorf("vethsync: while syncing on startup, got error: %v", err)
+		t.Fatalf("not expecting error: %v", err)
 	}
-	vs := VethWatcher{
-		mc: mc,
-		dc: dClient,
-	}
-
-	vs.doSync()
-}
-
-func TestGetBridgeInfoFromCNIConfig(t *testing.T) {
-	if !inDevelopment {
-		t.Skip("not in development mode")
-	}
-	logrus.SetLevel(logrus.DebugLevel)
-	cniConf := `{"10-rancher.conf": {
-  "bridge": "docker0",
-  "bridgeSubnet": "10.42.0.0/16",
-  "hairpinMode": true,
-  "hostNat": true,
-  "ipam": {
-    "isDebugLevel": "false",
-    "logToFile": "/var/log/rancher-cni.log",
-    "routes": [
-      {
-        "dst": "169.254.169.250/32"
-      }
-    ],
-    "type": "rancher-cni-ipam"
-  },
-  "isDebugLevel": "false",
-  "isDefaultGateway": true,
-  "linkMTUOverhead": 98,
-  "logToFile": "/var/log/rancher-cni.log",
-  "mtu": 1500,
-  "name": "rancher-cni-network",
-  "type": "rancher-bridge"
-}}
-`
-
-	var c map[string]interface{}
-
-	json.Unmarshal([]byte(cniConf), &c)
-	logrus.Debugf("c: %#v", c)
-
-	getBridgeInfoFromCNIConfig(c)
 }

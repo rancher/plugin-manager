@@ -12,11 +12,11 @@ cd $(dirname $0)/../package
 TAG=${TAG:-${IMAGE_VERSION}${SUFFIX}}
 REPO=${REPO:-rancher}
 
-if [ ! -e ../bin/plugin-manager ]; then
+if [ ! -e ../bin/plugin-manager -o ! -e ../bin/oldvethsync ]; then
     ../scripts/build
 fi
 
-cp ../bin/plugin-manager .
+cp ../bin/plugin-manager ../bin/oldvethsync .
 
 IMAGE=${REPO}/network-manager:${TAG}
 docker build -t ${IMAGE} .

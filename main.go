@@ -118,7 +118,7 @@ func run(c *cli.Context) error {
 		logrus.Errorf("Failed to start arpsync: %v", err)
 	}
 
-	if err := vethsync.Watch(c.String("vethsync-interval"), mClient, dClient); err != nil {
+	if err := vethsync.Watch(c.String("vethsync-interval"), c.String("metadata-url"), mClient, dClient, c.Bool("debug")); err != nil {
 		logrus.Errorf("Failed to start vethsync: %v", err)
 	}
 

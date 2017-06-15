@@ -3,3 +3,5 @@
 /dist
 *.swp
 /.trash-cache
+oldvethsync
+plugin-manager
