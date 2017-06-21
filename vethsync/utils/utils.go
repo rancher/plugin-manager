@@ -70,6 +70,7 @@ func GetHostViewVethMap(vethPrefix string, mc metadata.Client) (map[string]*netl
 		if _, found := localBridgesLinksMap[l.Attrs().MasterIndex]; !found {
 			continue
 		}
+		logrus.Debugf("vethsync/utils: %v", l)
 		veths[strconv.Itoa(l.Attrs().Index)] = &alllinks[index]
 	}
 
@@ -157,12 +158,17 @@ func GetContainersViewVethMapUsingID(dc *client.Client) (map[string]bool, error)
 // GetDanglingVeths compares the host view of the veths and the containers view of
 // veths to figure out if there are any dangling veths present
 func GetDanglingVeths(
-	hostVethMap map[string]*netlink.Link, containerVethMap map[string]bool) (map[string]*netlink.Link, error) {
+	indexInUse bool, hostVethMap map[string]*netlink.Link, containerVethMap map[string]bool) (map[string]*netlink.Link, error) {
 	logrus.Debugf("vethsync/utils: checking for dangling veths")
 
 	dangling := make(map[string]*netlink.Link)
 	for k, v := range hostVethMap {
-		_, found := containerVethMap[k]
+		var found bool
+		if indexInUse {
+			_, found = containerVethMap[k]
+		} else {
+			_, found = containerVethMap[(*v).Attrs().Name]
+		}
 		if !found {
 			logrus.Debugf("vethsync/utils: dangling veth found: %v", *v)
 			dangling[k] = v

@@ -87,7 +87,7 @@ func (vw *VethWatcher) doSync() error {
 	}
 	logrus.Debugf("vethsync: containersVethMap: %v", containersVethMap)
 
-	dangling, err := utils.GetDanglingVeths(hostVethMap, containersVethMap)
+	dangling, err := utils.GetDanglingVeths(false, hostVethMap, containersVethMap)
 	if err != nil {
 		logrus.Errorf("vethsync: error checking for dangling veths: %v", err)
 		return err

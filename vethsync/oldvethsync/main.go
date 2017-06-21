@@ -73,7 +73,7 @@ func doSync(mc metadata.Client, dc *client.Client) error {
 	}
 	logrus.Debugf("oldvethsync: containersVethMap: %v", containersVethMap)
 
-	dangling, err := utils.GetDanglingVeths(hostVethMap, containersVethMap)
+	dangling, err := utils.GetDanglingVeths(true, hostVethMap, containersVethMap)
 	if err != nil {
 		logrus.Errorf("oldvethsync: error checking for dangling veths: %v", err)
 		return err
