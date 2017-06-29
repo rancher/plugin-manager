@@ -49,10 +49,6 @@ func Watch(syncIntervalStr, metadataURL string, mc metadata.Client, dc *client.C
 		debug:        debug,
 	}
 
-	if err := vw.runOldVethSyncOnceAtStartup(); err != nil {
-		logrus.Errorf("vethsync: error running oldvethsync at startup: %v", err)
-	}
-
 	go mc.OnChange(120, vw.onChangeNoError)
 
 	return nil
