@@ -137,7 +137,9 @@ func (ctw *ConntrackTableWatcher) buildContainersMaps() (
 	}
 	containersMap := make(map[string]*metadata.Container)
 	for index, aContainer := range containers {
-		if !(aContainer.HostUUID == host.UUID && len(aContainer.Ports) > 0) {
+		if !(aContainer.HostUUID == host.UUID &&
+			(aContainer.State == "running" || aContainer.State == "starting") &&
+			len(aContainer.Ports) > 0) {
 			continue
 		}
 
