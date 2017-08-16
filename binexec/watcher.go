@@ -157,6 +157,15 @@ exec /usr/bin/nsenter -m -u -i -n -p -t %d -- $0 "$@"
 			break
 		}
 
+		fileInfo, err := os.Stat(p)
+		if err == nil && fileInfo.IsDir() {
+			logrus.Infof("%s is a dir, remove it", p)
+			if err = os.Remove(p); err != nil {
+				lastErr = err
+				break
+			}
+		}
+
 		if err := os.Rename(ptmp, p); err != nil {
 			lastErr = err
 		}
