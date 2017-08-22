@@ -136,11 +136,14 @@ func (w *watcher) enableLocalNetRouting(rules map[string]MASQRule) error {
 		s := rule.localRoutingSetting()
 		if s != "" {
 			logrus.Debugf("s: %v", s)
-			err := w.run("sysctl", "-w", s)
-			if err != nil {
+			cmd := exec.Command("sysctl", "-w", s)
+			var outBuf bytes.Buffer
+			cmd.Stdout = &outBuf
+			if err := cmd.Run(); err != nil {
 				logrus.Errorf("error enabling local net routing: %v", err)
-				return nil
+				return err
 			}
+			logrus.Debugf("Running %s, output: %s", s, outBuf.String())
 		}
 	}
 
