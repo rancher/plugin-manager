@@ -315,12 +315,14 @@ func networksByUUID(c metadata.Client) (map[string]metadata.Network, error) {
 }
 
 func setupKernelParameters() error {
-	cmd := exec.Command("sysctl", "-w", "net.bridge.bridge-nf-call-iptables=1")
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	s := "net.bridge.bridge-nf-call-iptables=1"
+	cmd := exec.Command("sysctl", "-w", s)
+	var outBuf bytes.Buffer
+	cmd.Stdout = &outBuf
 	if err := cmd.Run(); err != nil {
-		logrus.Errorf("error setting up kernel parameters")
+		logrus.Errorf("error setting up kernel parameters: %v", err)
 		return err
 	}
+	logrus.Debugf("Running %s, output: %s", s, outBuf.String())
 	return nil
 }
