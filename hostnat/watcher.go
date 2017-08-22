@@ -12,6 +12,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/pkg/errors"
 	"github.com/rancher/go-rancher-metadata/metadata"
+	"github.com/rancher/plugin-manager/utils"
 )
 
 var (
@@ -92,8 +93,13 @@ func (w *watcher) onChange(version string) error {
 		return err
 	}
 
+	host, err := w.c.GetSelfHost()
+	if err != nil {
+		return err
+	}
+
 	for _, network := range networks {
-		rule := w.networkToRule(network)
+		rule := w.networkToRule(network, host)
 		if rule != nil {
 			newRules[network.UUID] = *rule
 		}
@@ -111,9 +117,10 @@ func (w *watcher) onChange(version string) error {
 	return nil
 }
 
-func (w *watcher) networkToRule(network metadata.Network) *MASQRule {
+func (w *watcher) networkToRule(network metadata.Network, host metadata.Host) *MASQRule {
 	conf, _ := network.Metadata["cniConfig"].(map[string]interface{})
 	for _, file := range conf {
+		file = utils.UpdateCNIConfigByKeywords(file, host)
 		props, _ := file.(map[string]interface{})
 		hostNat, _ := props["hostNat"].(bool)
 		cniType, _ := props["type"].(string)

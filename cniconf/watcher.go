@@ -13,6 +13,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/rancher/cniglue"
 	"github.com/rancher/go-rancher-metadata/metadata"
+	"github.com/rancher/plugin-manager/utils"
 )
 
 var (
@@ -24,6 +25,7 @@ func init() {
 	glue.CniDir = cniDir
 }
 
+// Watch monitors metadata and generates CNI config
 func Watch(c metadata.Client) error {
 	w := &watcher{
 		c:       c,
@@ -69,7 +71,7 @@ func (w *watcher) onChange(version string) error {
 		}
 
 		if forceApply || !reflect.DeepEqual(w.applied[network.Name], network) {
-			if err := w.apply(network); err != nil {
+			if err := w.apply(network, host); err != nil {
 				logrus.Errorf("Failed to apply cni conf: %v", err)
 			}
 		}
@@ -78,7 +80,7 @@ func (w *watcher) onChange(version string) error {
 	return nil
 }
 
-func (w *watcher) apply(network metadata.Network) error {
+func (w *watcher) apply(network metadata.Network, host metadata.Host) error {
 	cniConf, _ := network.Metadata["cniConfig"].(map[string]interface{})
 	confDir := fmt.Sprintf(cniDir, network.Name)
 	if err := os.MkdirAll(confDir, 0700); err != nil {
@@ -87,6 +89,7 @@ func (w *watcher) apply(network metadata.Network) error {
 
 	var lastErr error
 	for file, config := range cniConf {
+		config = utils.UpdateCNIConfigByKeywords(config, host)
 		p := filepath.Join(confDir, file)
 		content, err := json.Marshal(config)
 		if err != nil {
