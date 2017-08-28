@@ -13,6 +13,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/rancher/cniglue"
 	"github.com/rancher/go-rancher-metadata/metadata"
+	"github.com/rancher/plugin-manager/events"
 	"github.com/rancher/plugin-manager/utils"
 )
 
@@ -90,6 +91,9 @@ func (w *watcher) apply(network metadata.Network, host metadata.Host) error {
 	var lastErr error
 	for file, config := range cniConf {
 		config = utils.UpdateCNIConfigByKeywords(config, host)
+
+		checkMTU(config)
+
 		p := filepath.Join(confDir, file)
 		content, err := json.Marshal(config)
 		if err != nil {
@@ -127,4 +131,38 @@ func (w *watcher) apply(network metadata.Network, host metadata.Host) error {
 	}
 
 	return lastErr
+}
+
+func checkMTU(config interface{}) {
+	props, _ := config.(map[string]interface{})
+	bridgeName, _ := props["bridge"].(string)
+	cniConfigMTU := fmt.Sprintf("%.0f", props["mtu"])
+
+	dockerBridgeMTU, exist, err := getDockerNetworkBridgeMTU(bridgeName)
+	if err != nil {
+		logrus.Errorf("checkMTU: Got error from docker api: %s", err)
+	}
+	if exist && dockerBridgeMTU != cniConfigMTU {
+		logrus.Errorf("checkMTU: Docker Bridge MTU %v is different from CNI config MTU %v", dockerBridgeMTU, cniConfigMTU)
+	}
+}
+
+func getDockerNetworkBridgeMTU(bridgeName string) (string, bool, error) {
+	c, err := events.NewDockerClient()
+	if err != nil {
+		return "", false, err
+	}
+
+	networks, err := c.ListNetworks()
+	if err != nil {
+		return "", false, err
+	}
+
+	for _, n := range networks {
+		if n.Driver == "bridge" && n.Options["com.docker.network.bridge.name"] == bridgeName {
+			return n.Options["com.docker.network.driver.mtu"], true, nil
+		}
+	}
+
+	return "", false, nil
 }
