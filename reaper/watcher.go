@@ -16,6 +16,8 @@ var (
 	serviceNameLabel = "io.rancher.stack_service.name"
 	metadataService  = "network-services/metadata"
 	dnsService       = "network-services/metadata/dns"
+	metadataService2 = "core-services/metadata"
+	dnsService2      = "core-services/metadata/dns"
 
 	recheckEvery = 5 * time.Minute
 )
@@ -102,7 +104,13 @@ func CheckMetadata(dockerClient *client.Client) error {
 		if container.Labels[uuidLabel] != "" && container.Labels[serviceNameLabel] == metadataService {
 			metadataIds = append(metadataIds, container.ID)
 		}
+		if container.Labels[uuidLabel] != "" && container.Labels[serviceNameLabel] == metadataService2 {
+			metadataIds = append(metadataIds, container.ID)
+		}
 		if container.Labels[uuidLabel] != "" && container.Labels[serviceNameLabel] == dnsService {
+			dnsIds = append(dnsIds, container.ID)
+		}
+		if container.Labels[uuidLabel] != "" && container.Labels[serviceNameLabel] == dnsService2 {
 			dnsIds = append(dnsIds, container.ID)
 		}
 	}

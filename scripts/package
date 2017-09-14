@@ -3,14 +3,18 @@ set -e
 
 source $(dirname $0)/version
 
-ARCH=${ARCH:?"ARCH not set"}
+ARCH=${ARCH:-"amd64"}
 SUFFIX=""
 [ "${ARCH}" != "amd64" ] && SUFFIX="_${ARCH}"
 
 cd $(dirname $0)/../package
 
-TAG=${TAG:-${IMAGE_VERSION}${SUFFIX}}
+TAG=${TAG:-${VERSION}${SUFFIX}}
 REPO=${REPO:-rancher}
+
+if echo $TAG | grep -q dirty; then
+    TAG=dev
+fi
 
 if [ ! -e ../bin/plugin-manager -o ! -e ../bin/oldvethsync ]; then
     ../scripts/build
