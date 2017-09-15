@@ -26,6 +26,12 @@ func LocalNetworks(mc metadata.Client) ([]metadata.Network, map[string]metadata.
 		return nil, nil, errors.Wrap(err, "error fetching services from metadata")
 	}
 
+	ret, routers := LocalNetworksByEntries(networks, host, services)
+
+	return ret, routers, nil
+}
+
+func LocalNetworksByEntries(networks []metadata.Network, host metadata.Host, services []metadata.Service) ([]metadata.Network, map[string]metadata.Container) {
 	routers := map[string]metadata.Container{}
 	for _, service := range services {
 		// Trick to select the primary service of the network plugin
@@ -55,7 +61,7 @@ func LocalNetworks(mc metadata.Client) ([]metadata.Network, map[string]metadata.
 		ret = append(ret, aNetwork)
 	}
 
-	return ret, routers, nil
+	return ret, routers
 }
 
 func ForEachContainerNS(dc *client.Client, mc metadata.Client, networkUUID string, f func(metadata.Container, ns.NetNS) error) error {

@@ -12,6 +12,8 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/pkg/errors"
 	"github.com/rancher/go-rancher-metadata/metadata"
+	cninetwork "github.com/rancher/plugin-manager/network"
+	"github.com/rancher/plugin-manager/utils"
 )
 
 var (
@@ -23,8 +25,9 @@ var (
 // Watch is used to monitor metadata for changes
 func Watch(c metadata.Client) error {
 	w := &watcher{
-		c:       c,
-		applied: map[string]PortRule{},
+		c:                  c,
+		appliedPortRules:   map[string]PortRule{},
+		appliedFilterRules: map[string]FilterRule{},
 	}
 
 	if err := setupKernelParameters(); err != nil {
@@ -36,9 +39,28 @@ func Watch(c metadata.Client) error {
 }
 
 type watcher struct {
-	c           metadata.Client
-	applied     map[string]PortRule
-	lastApplied time.Time
+	c                  metadata.Client
+	appliedPortRules   map[string]PortRule
+	appliedFilterRules map[string]FilterRule
+	lastApplied        time.Time
+}
+
+// FilterRule stores info about iptables filter table rule
+type FilterRule struct {
+	bridge       string
+	dockerBridge string
+	bridgeSubnet string
+}
+
+func (f FilterRule) filterIptables() []byte {
+	buf := &bytes.Buffer{}
+	buf.WriteString(fmt.Sprintf("-A CATTLE_FORWARD -d %s -o %s -j ACCEPT\n", f.bridgeSubnet, f.bridge))
+	if f.bridge != f.dockerBridge {
+		buf.WriteString(fmt.Sprintf("-A CATTLE_FORWARD -o %s -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT\n", f.bridge))
+		buf.WriteString(fmt.Sprintf("-A CATTLE_FORWARD -i %s ! -o %s -j ACCEPT\n", f.bridge, f.bridge))
+		buf.WriteString(fmt.Sprintf("-A CATTLE_FORWARD -i %s -o %s -j ACCEPT\n", f.bridge, f.bridge))
+	}
+	return buf.Bytes()
 }
 
 // PortRule is used to store the needed information for building a
@@ -156,13 +178,18 @@ func (w *watcher) onChangeNoError(version string) {
 func (w *watcher) onChange(version string) error {
 	logrus.Debug("Creating rule set")
 	newPortRules := map[string]PortRule{}
+	newFilterRules := map[string]FilterRule{}
 
 	host, err := w.c.GetSelfHost()
 	if err != nil {
 		return err
 	}
 
-	networks, err := networksByUUID(w.c)
+	networks, err := w.c.GetNetworks()
+	if err != nil {
+		return err
+	}
+	networksMap, err := networksByUUID(networks)
 	if err != nil {
 		return err
 	}
@@ -172,9 +199,22 @@ func (w *watcher) onChange(version string) error {
 		return err
 	}
 
+	services, err := w.c.GetServices()
+	if err != nil {
+		return err
+	}
+
+	// For iptables filter table rules
+	managedNetworks, _ := cninetwork.LocalNetworksByEntries(networks, host, services)
+	for _, n := range managedNetworks {
+		bridge, bridgeSubnet := getBridgeInfo(n, host)
+		if bridge != "" && bridgeSubnet != "" {
+			newFilterRules[n.UUID] = parseFilterRule(bridge, bridgeSubnet)
+		}
+	}
+
 	for _, container := range containers {
-		network := networks[container.NetworkUUID]
-		bridge := ""
+		network := networksMap[container.NetworkUUID]
 
 		if container.State != "running" && container.State != "starting" {
 			continue
@@ -186,16 +226,7 @@ func (w *watcher) onChange(version string) error {
 			continue
 		}
 
-		conf, _ := network.Metadata["cniConfig"].(map[string]interface{})
-		for _, file := range conf {
-			props, _ := file.(map[string]interface{})
-			cniType, _ := props["type"].(string)
-			checkBridge, _ := props["bridge"].(string)
-
-			if cniType == "rancher-bridge" && checkBridge != "" {
-				bridge = checkBridge
-			}
-		}
+		bridge, _ := getBridgeInfo(network, host)
 
 		for _, port := range container.Ports {
 			rule, ok := parsePortRule(bridge, host.AgentIP, container.PrimaryIp, port)
@@ -208,23 +239,23 @@ func (w *watcher) onChange(version string) error {
 	}
 
 	logrus.Debugf("New generated rules: %v", newPortRules)
-	if !reflect.DeepEqual(w.applied, newPortRules) {
-		logrus.Infof("Applying new port rules")
-		return w.apply(newPortRules)
+	if !reflect.DeepEqual(w.appliedPortRules, newPortRules) || !reflect.DeepEqual(w.appliedFilterRules, newFilterRules) {
+		logrus.Infof("Applying new rules")
+		return w.apply(newPortRules, newFilterRules)
 	} else if time.Now().Sub(w.lastApplied) > reapplyEvery {
-		return w.apply(newPortRules)
+		return w.apply(newPortRules, newFilterRules)
 	}
 
 	logrus.Debugf("No change in applied rules")
 	return nil
 }
 
-func (w *watcher) apply(rules map[string]PortRule) error {
+func (w *watcher) apply(prules map[string]PortRule, frules map[string]FilterRule) error {
 	buf := &bytes.Buffer{}
 	buf.WriteString("*raw\n")
 	buf.WriteString(":CATTLE_RAW_PREROUTING -\n")
 	buf.WriteString("-F CATTLE_RAW_PREROUTING\n")
-	for _, rule := range rules {
+	for _, rule := range prules {
 		buf.WriteString("\n")
 		buf.Write(rule.rawIptables())
 	}
@@ -240,7 +271,7 @@ func (w *watcher) apply(rules map[string]PortRule) error {
 	buf.WriteString("-F CATTLE_POSTROUTING\n")
 	buf.WriteString("-F CATTLE_OUTPUT\n")
 	buf.WriteString(fmt.Sprintf("-F %s\n", hostPortsPostRoutingChain))
-	for _, rule := range rules {
+	for _, rule := range prules {
 		buf.WriteString("\n")
 		buf.Write(rule.natIptables())
 	}
@@ -250,6 +281,10 @@ func (w *watcher) apply(rules map[string]PortRule) error {
 	buf.WriteString("-A CATTLE_FORWARD -m mark --mark 0x1068 -j ACCEPT\n")
 	// For k8s
 	buf.WriteString("-A CATTLE_FORWARD -m mark --mark 0x4000 -j ACCEPT\n")
+	for _, rule := range frules {
+		buf.WriteString("\n")
+		buf.Write(rule.filterIptables())
+	}
 
 	buf.WriteString("\nCOMMIT\n")
 
@@ -262,7 +297,7 @@ func (w *watcher) apply(rules map[string]PortRule) error {
 	cmd.Stdout = os.Stdout
 	cmd.Stdin = buf
 	if err := cmd.Run(); err != nil {
-		logrus.Errorf("Failed to apply port rules\n%s", buf)
+		logrus.Errorf("Failed to apply rules\n%s", buf)
 		return err
 	}
 
@@ -270,7 +305,8 @@ func (w *watcher) apply(rules map[string]PortRule) error {
 		return errors.Wrap(err, "Applying port base iptables rules")
 	}
 
-	w.applied = rules
+	w.appliedPortRules = prules
+	w.appliedFilterRules = frules
 	w.lastApplied = time.Now()
 	return nil
 }
@@ -300,12 +336,16 @@ func parsePortRule(bridge, hostIP, targetIP, portDef string) (PortRule, bool) {
 	}, true
 }
 
-func networksByUUID(c metadata.Client) (map[string]metadata.Network, error) {
-	networkByUUID := map[string]metadata.Network{}
-	networks, err := c.GetNetworks()
-	if err != nil {
-		return nil, err
+func parseFilterRule(bridge, bridgeSubnet string) FilterRule {
+	return FilterRule{
+		bridge:       bridge,
+		bridgeSubnet: bridgeSubnet,
+		dockerBridge: os.Getenv("DOCKER_BRIDGE"),
 	}
+}
+
+func networksByUUID(networks []metadata.Network) (map[string]metadata.Network, error) {
+	networkByUUID := map[string]metadata.Network{}
 
 	for _, network := range networks {
 		networkByUUID[network.UUID] = network
@@ -325,4 +365,21 @@ func setupKernelParameters() error {
 	}
 	logrus.Debugf("Running %s, output: %s", s, outBuf.String())
 	return nil
+}
+
+func getBridgeInfo(network metadata.Network, host metadata.Host) (bridge string, bridgeSubnet string) {
+	conf, _ := network.Metadata["cniConfig"].(map[string]interface{})
+	for _, file := range conf {
+		file = utils.UpdateCNIConfigByKeywords(file, host)
+		props, _ := file.(map[string]interface{})
+		cniType, _ := props["type"].(string)
+		checkBridge, _ := props["bridge"].(string)
+		bridgeSubnet, _ = props["bridgeSubnet"].(string)
+
+		if cniType == "rancher-bridge" && checkBridge != "" {
+			bridge = checkBridge
+			break
+		}
+	}
+	return bridge, bridgeSubnet
 }

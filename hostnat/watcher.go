@@ -16,8 +16,9 @@ import (
 )
 
 var (
-	reapplyEvery = 5 * time.Minute
-	natChain     = "CATTLE_NAT_POSTROUTING"
+	reapplyEvery        = 5 * time.Minute
+	natChain            = "CATTLE_NAT_POSTROUTING"
+	disableHostNatIPset = "RANCHER_DISABLE_HOST_NAT_IPSET"
 )
 
 // Watch is used to look for changes in metadata and apply hostnat related rules
@@ -44,10 +45,15 @@ type MASQRule struct {
 }
 
 func (p MASQRule) iptables() []byte {
+	_, err := exec.Command("/sbin/ipset", "create", "--exist", disableHostNatIPset, "hash:net").CombinedOutput()
+	if err != nil {
+		logrus.Errorf("Failed to create ipset: %v", err)
+	}
 	buf := &bytes.Buffer{}
-	buf.WriteString(fmt.Sprintf("-A %s -p tcp -s %s ! -o %s -j MASQUERADE --to-ports 1024-65535\n", natChain, p.Subnet, p.Bridge))
-	buf.WriteString(fmt.Sprintf("-A %s -p udp -s %s ! -o %s -j MASQUERADE --to-ports 1024-65535\n", natChain, p.Subnet, p.Bridge))
-	buf.WriteString(fmt.Sprintf("-A %s -s %s ! -o %s -j MASQUERADE\n", natChain, p.Subnet, p.Bridge))
+	buf.WriteString(fmt.Sprintf("-A %s -d %s -s %s -j ACCEPT\n", natChain, os.Getenv("METADATA_IP"), p.Subnet))
+	buf.WriteString(fmt.Sprintf("-A %s -p tcp -s %s -m set ! --match-set %s dst ! -o %s -j MASQUERADE --to-ports 1024-65535\n", natChain, p.Subnet, disableHostNatIPset, p.Bridge))
+	buf.WriteString(fmt.Sprintf("-A %s -p udp -s %s -m set ! --match-set %s dst ! -o %s -j MASQUERADE --to-ports 1024-65535\n", natChain, p.Subnet, disableHostNatIPset, p.Bridge))
+	buf.WriteString(fmt.Sprintf("-A %s -s %s -m set ! --match-set %s dst ! -o %s -j MASQUERADE\n", natChain, p.Subnet, disableHostNatIPset, p.Bridge))
 
 	// LOCAL src
 	buf.WriteString(fmt.Sprintf("-A %s -o %s -m addrtype --src-type LOCAL --dst-type UNICAST -j MASQUERADE", natChain, p.Bridge))
