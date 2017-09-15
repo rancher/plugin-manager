@@ -14,7 +14,6 @@ import (
 
 const (
 	RancherNameserver  = "169.254.169.250"
-	RancherDomain      = "rancher.internal"
 	RancherDNS         = "io.rancher.container.dns"
 	RancherDNSPriority = "io.rancher.container.dns.priority"
 	RancherNetwork     = "io.rancher.container.network"
@@ -37,14 +36,10 @@ func getDNSSearch(container *docker.Container) []string {
 			setRancherSearchDomains = false
 		}
 		if setRancherSearchDomains {
-			if value, ok := container.Config.Labels["io.rancher.stack_service.name"]; ok {
-				splitted := strings.Split(value, "/")
-				svc := strings.ToLower(splitted[1])
-				stack := strings.ToLower(splitted[0])
-				svcNameSpace = svc + "." + stack + "." + RancherDomain
-				stackNameSpace = stack + "." + RancherDomain
-				defaultDomains = append(defaultDomains, svcNameSpace)
-				defaultDomains = append(defaultDomains, stackNameSpace)
+			if value, ok := container.Config.Labels["io.rancher.container.dnssearch"]; ok {
+				for _, domain := range strings.Split(value, ",") {
+					defaultDomains = append(defaultDomains, domain)
+				}
 			}
 		}
 	}
@@ -57,9 +52,6 @@ func getDNSSearch(container *docker.Container) []string {
 			}
 		}
 	}
-
-	// default rancher domain
-	defaultDomains = append(defaultDomains, RancherDomain)
 
 	log.Debugf("defaultDomains: %v", defaultDomains)
 	return defaultDomains
