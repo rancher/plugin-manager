@@ -15,6 +15,7 @@ import (
 	"github.com/rancher/plugin-manager/events"
 	"github.com/rancher/plugin-manager/hostnat"
 	"github.com/rancher/plugin-manager/hostports"
+	"github.com/rancher/plugin-manager/iptablessync"
 	"github.com/rancher/plugin-manager/macsync"
 	"github.com/rancher/plugin-manager/network"
 	"github.com/rancher/plugin-manager/reaper"
@@ -54,6 +55,11 @@ func main() {
 			Name:  "vethsync-interval",
 			Usage: fmt.Sprintf("Customize the interval of vethsync in seconds (default: %v)", vethsync.DefaultSyncInterval),
 			Value: "",
+		},
+		cli.IntFlag{
+			Name:  "iptables-sync-interval",
+			Usage: fmt.Sprintf("Customize the interval of iptables-sync in seconds (default: %v)", iptablessync.DefaultSyncInterval),
+			Value: iptablessync.DefaultSyncInterval,
 		},
 		cli.BoolFlag{
 			Name:  "debug",
@@ -96,6 +102,10 @@ func run(c *cli.Context) error {
 
 	if err := reaper.Watch(dClient, mClient); err != nil {
 		logrus.Errorf("Failed to start unmanaged container reaper: %v", err)
+	}
+
+	if err := iptablessync.Watch(c.Int("iptables-sync-interval"), mClient); err != nil {
+		logrus.Errorf("Failed to start host ports configuration: %v", err)
 	}
 
 	if err := hostports.Watch(mClient); err != nil {

@@ -10,16 +10,14 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/pkg/errors"
 	"github.com/rancher/go-rancher-metadata/metadata"
 	cninetwork "github.com/rancher/plugin-manager/network"
 	"github.com/rancher/plugin-manager/utils"
 )
 
 var (
-	reapplyEvery              = 5 * time.Minute
-	hostPortsLabel            = "io.rancher.network.host_ports"
-	hostPortsPostRoutingChain = "CATTLE_HOSTPORTS_POSTROUTING"
+	reapplyEvery   = 5 * time.Minute
+	hostPortsLabel = "io.rancher.network.host_ports"
 )
 
 // Watch is used to monitor metadata for changes
@@ -125,40 +123,10 @@ func (p PortRule) natIptables() []byte {
 	buf.WriteString(fmt.Sprintf("\n-A CATTLE_OUTPUT -p %v -m %v --dport %v -m addrtype --dst-type LOCAL -j DNAT --to-destination %v:%v",
 		p.Protocol, p.Protocol, p.SourcePort, p.TargetIP, p.TargetPort))
 
-	buf.WriteString(fmt.Sprintf("\n-A %s -s %v -d %v -p %v -m %v --dport %v -j MASQUERADE",
-		hostPortsPostRoutingChain, p.TargetIP, p.TargetIP, p.Protocol, p.Protocol, p.TargetPort))
+	buf.WriteString(fmt.Sprintf("\n-A CATTLE_HOSTPORTS_POSTROUTING -s %v -d %v -p %v -m %v --dport %v -j MASQUERADE",
+		p.TargetIP, p.TargetIP, p.Protocol, p.Protocol, p.TargetPort))
 
 	return buf.Bytes()
-}
-
-func (w *watcher) insertBaseRules() error {
-	var e error
-	if w.run("iptables", "-w", "-t", "raw", "-C", "PREROUTING", "-m", "addrtype", "--dst-type", "LOCAL", "-j", "CATTLE_RAW_PREROUTING") != nil {
-		if err := w.run("iptables", "-w", "-t", "raw", "-I", "PREROUTING", "-m", "addrtype", "--dst-type", "LOCAL", "-j", "CATTLE_RAW_PREROUTING"); err != nil {
-			e = errors.Wrap(e, err.Error())
-		}
-	}
-	if w.run("iptables", "-w", "-t", "nat", "-C", "PREROUTING", "-m", "addrtype", "--dst-type", "LOCAL", "-j", "CATTLE_PREROUTING") != nil {
-		if err := w.run("iptables", "-w", "-t", "nat", "-I", "PREROUTING", "-m", "addrtype", "--dst-type", "LOCAL", "-j", "CATTLE_PREROUTING"); err != nil {
-			e = errors.Wrap(e, err.Error())
-		}
-	}
-	if w.run("iptables", "-w", "-C", "FORWARD", "-j", "CATTLE_FORWARD") != nil {
-		if err := w.run("iptables", "-w", "-I", "FORWARD", "-j", "CATTLE_FORWARD"); err != nil {
-			e = errors.Wrap(e, err.Error())
-		}
-	}
-	if w.run("iptables", "-w", "-t", "nat", "-C", "OUTPUT", "-m", "addrtype", "--dst-type", "LOCAL", "-j", "CATTLE_OUTPUT") != nil {
-		if err := w.run("iptables", "-w", "-t", "nat", "-I", "OUTPUT", "-m", "addrtype", "--dst-type", "LOCAL", "-j", "CATTLE_OUTPUT"); err != nil {
-			e = errors.Wrap(e, err.Error())
-		}
-	}
-	if w.run("iptables", "-w", "-t", "nat", "-C", "POSTROUTING", "-j", hostPortsPostRoutingChain) != nil {
-		if err := w.run("iptables", "-w", "-t", "nat", "-I", "POSTROUTING", "-j", hostPortsPostRoutingChain); err != nil {
-			e = errors.Wrap(e, err.Error())
-		}
-	}
-	return e
 }
 
 func (w *watcher) run(args ...string) error {
@@ -266,17 +234,19 @@ func (w *watcher) apply(prules map[string]PortRule, frules map[string]FilterRule
 	buf.WriteString(":CATTLE_PREROUTING -\n")
 	buf.WriteString(":CATTLE_POSTROUTING -\n")
 	buf.WriteString(":CATTLE_OUTPUT -\n")
-	buf.WriteString(fmt.Sprintf(":%s -\n", hostPortsPostRoutingChain))
+	buf.WriteString(":CATTLE_HOSTPORTS_POSTROUTING -\n")
 	buf.WriteString("-F CATTLE_PREROUTING\n")
 	buf.WriteString("-F CATTLE_POSTROUTING\n")
 	buf.WriteString("-F CATTLE_OUTPUT\n")
-	buf.WriteString(fmt.Sprintf("-F %s\n", hostPortsPostRoutingChain))
+	buf.WriteString("-F CATTLE_HOSTPORTS_POSTROUTING\n")
 	for _, rule := range prules {
 		buf.WriteString("\n")
 		buf.Write(rule.natIptables())
 	}
 
-	buf.WriteString("\nCOMMIT\n\n*filter\n:CATTLE_FORWARD -\n")
+	buf.WriteString("\nCOMMIT\n")
+	buf.WriteString("*filter\n")
+	buf.WriteString(":CATTLE_FORWARD -\n")
 	buf.WriteString("-F CATTLE_FORWARD\n")
 	buf.WriteString("-A CATTLE_FORWARD -m mark --mark 0x1068 -j ACCEPT\n")
 	// For k8s
@@ -299,10 +269,6 @@ func (w *watcher) apply(prules map[string]PortRule, frules map[string]FilterRule
 	if err := cmd.Run(); err != nil {
 		logrus.Errorf("Failed to apply rules\n%s", buf)
 		return err
-	}
-
-	if err := w.insertBaseRules(); err != nil {
-		return errors.Wrap(err, "Applying port base iptables rules")
 	}
 
 	w.appliedPortRules = prules

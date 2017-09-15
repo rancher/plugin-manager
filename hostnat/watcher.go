@@ -10,14 +10,12 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/pkg/errors"
 	"github.com/rancher/go-rancher-metadata/metadata"
 	"github.com/rancher/plugin-manager/utils"
 )
 
 var (
 	reapplyEvery        = 5 * time.Minute
-	natChain            = "CATTLE_NAT_POSTROUTING"
 	disableHostNatIPset = "RANCHER_DISABLE_HOST_NAT_IPSET"
 )
 
@@ -50,13 +48,13 @@ func (p MASQRule) iptables() []byte {
 		logrus.Errorf("Failed to create ipset: %v", err)
 	}
 	buf := &bytes.Buffer{}
-	buf.WriteString(fmt.Sprintf("-A %s -d %s -s %s -j ACCEPT\n", natChain, os.Getenv("METADATA_IP"), p.Subnet))
-	buf.WriteString(fmt.Sprintf("-A %s -p tcp -s %s -m set ! --match-set %s dst ! -o %s -j MASQUERADE --to-ports 1024-65535\n", natChain, p.Subnet, disableHostNatIPset, p.Bridge))
-	buf.WriteString(fmt.Sprintf("-A %s -p udp -s %s -m set ! --match-set %s dst ! -o %s -j MASQUERADE --to-ports 1024-65535\n", natChain, p.Subnet, disableHostNatIPset, p.Bridge))
-	buf.WriteString(fmt.Sprintf("-A %s -s %s -m set ! --match-set %s dst ! -o %s -j MASQUERADE\n", natChain, p.Subnet, disableHostNatIPset, p.Bridge))
+	buf.WriteString(fmt.Sprintf("-A CATTLE_NAT_POSTROUTING -d %s -s %s -j ACCEPT\n", os.Getenv("METADATA_IP"), p.Subnet))
+	buf.WriteString(fmt.Sprintf("-A CATTLE_NAT_POSTROUTING -p tcp -s %s -m set ! --match-set %s dst ! -o %s -j MASQUERADE --to-ports 1024-65535\n", p.Subnet, disableHostNatIPset, p.Bridge))
+	buf.WriteString(fmt.Sprintf("-A CATTLE_NAT_POSTROUTING -p udp -s %s -m set ! --match-set %s dst ! -o %s -j MASQUERADE --to-ports 1024-65535\n", p.Subnet, disableHostNatIPset, p.Bridge))
+	buf.WriteString(fmt.Sprintf("-A CATTLE_NAT_POSTROUTING -s %s -m set ! --match-set %s dst ! -o %s -j MASQUERADE\n", p.Subnet, disableHostNatIPset, p.Bridge))
 
 	// LOCAL src
-	buf.WriteString(fmt.Sprintf("-A %s -o %s -m addrtype --src-type LOCAL --dst-type UNICAST -j MASQUERADE", natChain, p.Bridge))
+	buf.WriteString(fmt.Sprintf("-A CATTLE_NAT_POSTROUTING -o %s -m addrtype --src-type LOCAL --dst-type UNICAST -j MASQUERADE", p.Bridge))
 	return buf.Bytes()
 }
 
@@ -67,13 +65,6 @@ func (p MASQRule) localRoutingSetting() string {
 	}
 
 	return s
-}
-
-func (w *watcher) insertBaseRules() error {
-	if w.run("iptables", "-w", "-t", "nat", "-C", "POSTROUTING", "-j", natChain) != nil {
-		return w.run("iptables", "-w", "-t", "nat", "-I", "POSTROUTING", "-j", natChain)
-	}
-	return nil
 }
 
 func (w *watcher) run(args ...string) error {
@@ -169,7 +160,9 @@ func (w *watcher) apply(rules map[string]MASQRule) error {
 	}
 
 	buf := &bytes.Buffer{}
-	buf.WriteString(fmt.Sprintf("*nat\n:%s -\n-F %s\n", natChain, natChain))
+	buf.WriteString("*nat\n")
+	buf.WriteString(":CATTLE_NAT_POSTROUTING -\n")
+	buf.WriteString("-F CATTLE_NAT_POSTROUTING\n")
 	for _, rule := range rules {
 		buf.WriteString("\n")
 		buf.Write(rule.iptables())
@@ -188,10 +181,6 @@ func (w *watcher) apply(rules map[string]MASQRule) error {
 	if err := cmd.Run(); err != nil {
 		logrus.Errorf("Failed to apply rules\n%s", buf)
 		return err
-	}
-
-	if err := w.insertBaseRules(); err != nil {
-		return errors.Wrap(err, "Installing base rules")
 	}
 
 	w.applied = rules
