@@ -33,6 +33,9 @@ func GetHostViewVethMap(vethPrefix string, mc metadata.Client) (map[string]*netl
 		return nil, err
 	}
 	logrus.Debugf("vethsync/utils: localNetworks: %v", localNetworks)
+	if len(localNetworks) == 0 {
+		return veths, nil
+	}
 
 	localBridges := make(map[string]bool)
 	for _, n := range localNetworks {
