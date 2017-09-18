@@ -23,6 +23,10 @@ import (
 	"github.com/urfave/cli"
 )
 
+const (
+	metadataURLTemplate = "http://%v/2016-07-29"
+)
+
 // VERSION of the binary, that can be changed during build
 var VERSION = "v0.0.0-dev"
 
@@ -32,13 +36,22 @@ func main() {
 	app.Version = VERSION
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
-			Name:  "metadata-url",
-			Value: "http://rancher-metadata/2016-07-29",
+			Name:  "metadata-address",
+			Value: "169.254.169.250",
+		},
+		cli.StringFlag{
+			Name:   "metadata-listen-port",
+			EnvVar: "RANCHER_METADATA_LISTEN_PORT",
+			Value:  "80",
 		},
 		cli.StringFlag{
 			Name:  "conntracksync-interval",
 			Usage: fmt.Sprintf("Customize the interval of conntracksync in seconds (default: %v)", conntracksync.DefaultSyncInterval),
 			Value: "",
+		},
+		cli.BoolFlag{
+			Name:  "disable-routesync",
+			Usage: "Disable routesync",
 		},
 		cli.StringFlag{
 			Name:  "routesync-interval",
@@ -73,9 +86,11 @@ func run(c *cli.Context) error {
 		logrus.SetLevel(logrus.DebugLevel)
 	}
 
-	if err := routesync.Watch(c.String("routesync-interval")); err != nil {
-		logrus.Errorf("Failed to start routesync: %v", err)
-		return err
+	if !c.Bool("disable-routesync") {
+		if err := routesync.Watch(c.String("routesync-interval")); err != nil {
+			logrus.Errorf("Failed to start routesync: %v", err)
+			return err
+		}
 	}
 
 	dClient, err := client.NewEnvClient()
@@ -85,8 +100,9 @@ func run(c *cli.Context) error {
 
 	reaper.CheckMetadata(dClient)
 
+	metadataURL := fmt.Sprintf(metadataURLTemplate, c.String("metadata-address"))
 	logrus.Infof("Waiting for metadata")
-	mClient, err := metadata.NewClientAndWait(c.String("metadata-url"))
+	mClient, err := metadata.NewClientAndWait(metadataURL)
 	if err != nil {
 		return errors.Wrap(err, "Creating metadata client")
 	}
@@ -102,7 +118,7 @@ func run(c *cli.Context) error {
 		logrus.Errorf("Failed to start unmanaged container reaper: %v", err)
 	}
 
-	if err := hostports.Watch(mClient); err != nil {
+	if err := hostports.Watch(mClient, c.String("metadata-address"), c.String("metadata-listen-port")); err != nil {
 		logrus.Errorf("Failed to start host ports configuration: %v", err)
 	}
 
@@ -124,7 +140,7 @@ func run(c *cli.Context) error {
 		logrus.Errorf("Failed to start arpsync: %v", err)
 	}
 
-	if err := vethsync.Watch(c.String("vethsync-interval"), c.String("metadata-url"), mClient, dClient, c.Bool("debug")); err != nil {
+	if err := vethsync.Watch(c.String("vethsync-interval"), metadataURL, mClient, dClient, c.Bool("debug")); err != nil {
 		logrus.Errorf("Failed to start vethsync: %v", err)
 	}
 
