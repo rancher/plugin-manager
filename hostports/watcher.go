@@ -21,11 +21,13 @@ var (
 )
 
 // Watch is used to monitor metadata for changes
-func Watch(c metadata.Client) error {
+func Watch(c metadata.Client, metadataAddress, metadataListenPort string) error {
 	w := &watcher{
 		c:                  c,
 		appliedPortRules:   map[string]PortRule{},
 		appliedFilterRules: map[string]FilterRule{},
+		metadataAddress:    metadataAddress,
+		metadataListenPort: metadataListenPort,
 	}
 
 	if err := setupKernelParameters(); err != nil {
@@ -41,6 +43,8 @@ type watcher struct {
 	appliedPortRules   map[string]PortRule
 	appliedFilterRules map[string]FilterRule
 	lastApplied        time.Time
+	metadataAddress    string
+	metadataListenPort string
 }
 
 // FilterRule stores info about iptables filter table rule
@@ -239,6 +243,12 @@ func (w *watcher) apply(prules map[string]PortRule, frules map[string]FilterRule
 	buf.WriteString("-F CATTLE_POSTROUTING\n")
 	buf.WriteString("-F CATTLE_OUTPUT\n")
 	buf.WriteString("-F CATTLE_HOSTPORTS_POSTROUTING\n")
+
+	if w.metadataListenPort != "80" {
+		buf.WriteString(fmt.Sprintf("-A CATTLE_PREROUTING -d %s/32 -p tcp -m tcp --dport 80 -j DNAT --to-destination 169.254.169.250:%s\n", w.metadataAddress, w.metadataListenPort))
+		buf.WriteString(fmt.Sprintf("-A CATTLE_OUTPUT -d %s/32 -p tcp -m tcp --dport 80 -j DNAT --to-destination 169.254.169.250:%s\n", w.metadataAddress, w.metadataListenPort))
+	}
+
 	for _, rule := range prules {
 		buf.WriteString("\n")
 		buf.Write(rule.natIptables())
