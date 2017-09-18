@@ -56,6 +56,10 @@ func main() {
 			Value: "",
 		},
 		cli.BoolFlag{
+			Name:  "disable-cni-setup",
+			Usage: "Disable setting up CNI config and binaries",
+		},
+		cli.BoolFlag{
 			Name:  "debug",
 			Usage: "Turn on debug logging",
 		},
@@ -110,8 +114,10 @@ func run(c *cli.Context) error {
 		logrus.Errorf("Failed to start conntracksync: %v", err)
 	}
 
-	if err := cniconf.Watch(mClient); err != nil {
-		logrus.Errorf("Failed to start cni config: %v", err)
+	if !c.Bool("disable-cni-setup") {
+		if err := cniconf.Watch(mClient); err != nil {
+			logrus.Errorf("Failed to start cni config: %v", err)
+		}
 	}
 
 	if err := arpsync.Watch(c.String("arpsync-interval"), mClient, dClient); err != nil {
@@ -122,7 +128,10 @@ func run(c *cli.Context) error {
 		logrus.Errorf("Failed to start vethsync: %v", err)
 	}
 
-	binWatcher := binexec.Watch(mClient, dClient)
+	var binWatcher *binexec.Watcher
+	if !c.Bool("disable-cni-setup") {
+		binWatcher = binexec.Watch(mClient, dClient)
+	}
 
 	if err := events.Watch(100, manager, binWatcher); err != nil {
 		return err

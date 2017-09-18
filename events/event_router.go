@@ -1,9 +1,11 @@
 package events
 
 import (
+	"reflect"
+	"time"
+
 	log "github.com/Sirupsen/logrus"
 	"github.com/fsouza/go-dockerclient"
-	"time"
 )
 
 const workerTimeout = 60 * time.Second
@@ -84,6 +86,9 @@ func (w *worker) doWork(event *docker.APIEvents, e *EventRouter) {
 	if handlers, ok := e.handlers[event.Status]; ok {
 		log.Debugf("Processing event: %#v", event)
 		for _, handler := range handlers {
+			if reflect.ValueOf(handler).IsNil() {
+				continue
+			}
 			if err := handler.Handle(event); err != nil {
 				log.Errorf("Error processing event %#v. Error: %v", event, err)
 			}
