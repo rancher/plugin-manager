@@ -74,6 +74,10 @@ func NewCNIExec(state *DockerPluginState) (*CNIExec, error) {
 		c.runtimeConf.Args = append(c.runtimeConf.Args, [2]string{"MACAddress", MACAddress})
 	}
 
+	if ipAddress, ok := state.Config.Labels["io.rancher.container.ip"]; ok {
+		c.runtimeConf.Args = append(c.runtimeConf.Args, [2]string{"IPAddress", ipAddress})
+	}
+
 	network := state.HostConfig.NetworkMode.NetworkName()
 	if network == "" {
 		network = "default"
