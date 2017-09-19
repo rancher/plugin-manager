@@ -45,6 +45,14 @@ func main() {
 			EnvVar: "RANCHER_METADATA_LISTEN_PORT",
 			Value:  "80",
 		},
+		cli.BoolFlag{
+			Name:  "disable-macsync",
+			Usage: "Disable macsync",
+		},
+		cli.BoolFlag{
+			Name:  "disable-conntracksync",
+			Usage: "Disable conntracksync",
+		},
 		cli.StringFlag{
 			Name:  "conntracksync-interval",
 			Usage: fmt.Sprintf("Customize the interval of conntracksync in seconds (default: %v)", conntracksync.DefaultSyncInterval),
@@ -59,10 +67,18 @@ func main() {
 			Usage: fmt.Sprintf("Customize the interval of routesync in seconds (default: %v)", routesync.DefaultSyncInterval),
 			Value: "",
 		},
+		cli.BoolFlag{
+			Name:  "disable-arpsync",
+			Usage: "Disable arpsync",
+		},
 		cli.StringFlag{
 			Name:  "arpsync-interval",
 			Usage: fmt.Sprintf("Customize the interval of arpsync in seconds (default: %v)", arpsync.DefaultSyncInterval),
 			Value: "",
+		},
+		cli.BoolFlag{
+			Name:  "disable-vethsync",
+			Usage: "Disable vethsync",
 		},
 		cli.StringFlag{
 			Name:  "vethsync-interval",
@@ -113,7 +129,9 @@ func run(c *cli.Context) error {
 		return errors.Wrap(err, "Creating metadata client")
 	}
 
-	macsync.SyncMACAddresses(mClient, dClient)
+	if !c.Bool("disable-macsync") {
+		macsync.SyncMACAddresses(mClient, dClient)
+	}
 
 	manager, err := network.NewManager(dClient)
 	if err != nil {
@@ -136,8 +154,10 @@ func run(c *cli.Context) error {
 		logrus.Errorf("Failed to start host nat configuration: %v", err)
 	}
 
-	if err := conntracksync.Watch(c.String("conntracksync-interval"), mClient); err != nil {
-		logrus.Errorf("Failed to start conntracksync: %v", err)
+	if !c.Bool("disable-conntracksync") {
+		if err := conntracksync.Watch(c.String("conntracksync-interval"), mClient); err != nil {
+			logrus.Errorf("Failed to start conntracksync: %v", err)
+		}
 	}
 
 	if !c.Bool("disable-cni-setup") {
@@ -146,12 +166,16 @@ func run(c *cli.Context) error {
 		}
 	}
 
-	if err := arpsync.Watch(c.String("arpsync-interval"), mClient, dClient); err != nil {
-		logrus.Errorf("Failed to start arpsync: %v", err)
+	if !c.Bool("disable-arpsync") {
+		if err := arpsync.Watch(c.String("arpsync-interval"), mClient, dClient); err != nil {
+			logrus.Errorf("Failed to start arpsync: %v", err)
+		}
 	}
 
-	if err := vethsync.Watch(c.String("vethsync-interval"), metadataURL, mClient, dClient, c.Bool("debug")); err != nil {
-		logrus.Errorf("Failed to start vethsync: %v", err)
+	if !c.Bool("disable-vethsync") {
+		if err := vethsync.Watch(c.String("vethsync-interval"), metadataURL, mClient, dClient, c.Bool("debug")); err != nil {
+			logrus.Errorf("Failed to start vethsync: %v", err)
+		}
 	}
 
 	var binWatcher *binexec.Watcher
