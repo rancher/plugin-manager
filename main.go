@@ -49,6 +49,10 @@ func main() {
 			Usage: "Disable macsync",
 		},
 		cli.BoolFlag{
+			Name:  "disable-dns-setup",
+			Usage: "Disable setting up of resolv.conf",
+		},
+		cli.BoolFlag{
 			Name:  "disable-conntracksync",
 			Usage: "Disable conntracksync",
 		},
@@ -173,7 +177,7 @@ func run(c *cli.Context) error {
 		binWatcher = binexec.Watch(mClient, dClient)
 	}
 
-	if err := events.Watch(100, manager, binWatcher); err != nil {
+	if err := events.Watch(100, manager, binWatcher, c.Bool("disable-dns-setup")); err != nil {
 		return err
 	}
 
