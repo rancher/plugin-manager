@@ -88,6 +88,9 @@ func NewCNIExec(state *DockerPluginState) (*CNIExec, error) {
 	if err != nil {
 		return nil, err
 	}
+	if len(files) == 0 {
+		return nil, fmt.Errorf("couldn't find any CNI network configurations")
+	}
 	sort.Strings(files)
 
 	os.Setenv("PATH", strings.Join(CniPath, ":"))
