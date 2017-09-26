@@ -43,20 +43,14 @@ func NewEventRouter(bufferSize int, workerPoolSize int, dockerClient *docker.Cli
 func (e *EventRouter) Start() error {
 	log.Info("Starting event router.")
 	go e.routeEvents()
-	if err := e.dockerClient.AddEventListener(e.listener); err != nil {
-		return err
-	}
-	return nil
+	return e.dockerClient.AddEventListener(e.listener)
 }
 
 func (e *EventRouter) Stop() error {
 	if e.listener == nil {
 		return nil
 	}
-	if err := e.dockerClient.RemoveEventListener(e.listener); err != nil {
-		return err
-	}
-	return nil
+	return e.dockerClient.RemoveEventListener(e.listener)
 }
 
 func (e *EventRouter) routeEvents() {
