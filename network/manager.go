@@ -110,7 +110,7 @@ func (n *Manager) networkUp(id string, inspect types.ContainerJSON, retryCount i
 		return n.s.recordNetworkUpError(id, startedAt, errors.Wrap(err, "Couldn't find plugin state"))
 	}
 	result, err := glue.CNIAdd(pluginState)
-	if err != nil {
+	if err != nil || result == nil {
 		if retryCount < maxRetries {
 			go n.retry(id, retryCount+1)
 			return err
