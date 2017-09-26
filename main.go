@@ -17,7 +17,6 @@ import (
 	"github.com/rancher/plugin-manager/hostports"
 	"github.com/rancher/plugin-manager/macsync"
 	"github.com/rancher/plugin-manager/network"
-	"github.com/rancher/plugin-manager/reaper"
 	"github.com/rancher/plugin-manager/routesync"
 	"github.com/rancher/plugin-manager/vethsync"
 	"github.com/urfave/cli"
@@ -118,8 +117,6 @@ func run(c *cli.Context) error {
 		return err
 	}
 
-	reaper.CheckMetadata(dClient)
-
 	metadataURL := fmt.Sprintf(metadataURLTemplate, c.String("metadata-address"))
 	logrus.Infof("Waiting for metadata")
 	mClient, err := metadata.NewClientAndWait(metadataURL)
@@ -134,10 +131,6 @@ func run(c *cli.Context) error {
 	manager, err := network.NewManager(dClient)
 	if err != nil {
 		return err
-	}
-
-	if err := reaper.Watch(dClient, mClient); err != nil {
-		logrus.Errorf("Failed to start unmanaged container reaper: %v", err)
 	}
 
 	if err := hostports.Watch(mClient, c.String("metadata-address"), c.String("metadata-listen-port")); err != nil {
