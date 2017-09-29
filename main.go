@@ -130,6 +130,11 @@ func run(c *cli.Context) error {
 		return err
 	}
 
+	manager, err := network.NewManager(dClient)
+	if err != nil {
+		return err
+	}
+
 	metadataURL := fmt.Sprintf(metadataURLTemplate, c.String("metadata-address"))
 	logrus.Infof("Waiting for metadata")
 	mClient, err := metadata.NewClientAndWait(metadataURL)
@@ -139,11 +144,6 @@ func run(c *cli.Context) error {
 
 	if !c.Bool("disable-macsync") {
 		macsync.SyncMACAddresses(mClient, dClient)
-	}
-
-	manager, err := network.NewManager(dClient)
-	if err != nil {
-		return err
 	}
 
 	if err := hostports.Watch(mClient, c.String("metadata-address"), c.String("metadata-listen-port")); err != nil {
