@@ -1,8 +1,6 @@
 package vethsync
 
 import (
-	"os"
-	"os/exec"
 	"strconv"
 	"time"
 
@@ -94,22 +92,5 @@ func (vw *VethWatcher) doSync() error {
 		utils.CleanUpDanglingVeths(dangling)
 	}
 
-	return nil
-}
-
-func (vw *VethWatcher) runOldVethSyncOnceAtStartup() error {
-	cmdStr := []string{"oldvethsync", "--metadata-url", vw.metadataURL}
-	if vw.debug {
-		cmdStr = append(cmdStr, "--debug")
-	}
-	logrus.Debugf("vethsync: about to run cmd: %v", cmdStr)
-	cmd := exec.Command(cmdStr[0], cmdStr[1:]...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	err := cmd.Run()
-	if err != nil {
-		logrus.Errorf("vethsync: error running cmd %v: %v", cmdStr, err)
-		return err
-	}
 	return nil
 }

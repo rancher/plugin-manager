@@ -16,11 +16,11 @@ if echo $TAG | grep -q dirty; then
     TAG=dev
 fi
 
-if [ ! -e ../bin/plugin-manager -o ! -e ../bin/oldvethsync ]; then
+if [ ! -e ../bin/plugin-manager ]; then
     ../scripts/build
 fi
 
-cp ../bin/plugin-manager ../bin/oldvethsync .
+cp ../bin/plugin-manager .
 
 IMAGE=${REPO}/network-manager:${TAG}
 docker build -t ${IMAGE} .
