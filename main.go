@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/exec"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/engine-api/client"
@@ -100,10 +101,22 @@ func main() {
 	app.Run(os.Args)
 }
 
+func unmountVolumes() {
+	cmd := exec.Command("umount.sh")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	err := cmd.Run()
+	if err != nil {
+		logrus.Errorf("Failed to run umount.sh: %v", err)
+	}
+}
+
 func run(c *cli.Context) error {
 	if c.Bool("debug") {
 		logrus.SetLevel(logrus.DebugLevel)
 	}
+
+	go unmountVolumes()
 
 	if !c.Bool("disable-routesync") {
 		if err := routesync.Watch(c.String("routesync-interval")); err != nil {

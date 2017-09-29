@@ -1,5 +1,5 @@
 FROM rancher/agent-base:v0.3.0
 RUN ln -s / /mnt/sda1
-COPY plugin-manager start.sh oldvethsync /usr/bin/
-ENTRYPOINT ["/rancher-entrypoint.sh", "/usr/bin/start.sh"]
+COPY plugin-manager umount.sh oldvethsync /usr/bin/
+ENTRYPOINT ["/rancher-entrypoint.sh"]
 CMD ["plugin-manager"]
