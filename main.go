@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/exec"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/engine-api/client"
@@ -100,10 +101,22 @@ func main() {
 	app.Run(os.Args)
 }
 
+func unmountVolumes() {
+	cmd := exec.Command("umount.sh")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	err := cmd.Run()
+	if err != nil {
+		logrus.Errorf("Failed to run umount.sh: %v", err)
+	}
+}
+
 func run(c *cli.Context) error {
 	if c.Bool("debug") {
 		logrus.SetLevel(logrus.DebugLevel)
 	}
+
+	go unmountVolumes()
 
 	if !c.Bool("disable-routesync") {
 		if err := routesync.Watch(c.String("routesync-interval")); err != nil {
@@ -117,6 +130,11 @@ func run(c *cli.Context) error {
 		return err
 	}
 
+	manager, err := network.NewManager(dClient)
+	if err != nil {
+		return err
+	}
+
 	metadataURL := fmt.Sprintf(metadataURLTemplate, c.String("metadata-address"))
 	logrus.Infof("Waiting for metadata")
 	mClient, err := metadata.NewClientAndWait(metadataURL)
@@ -126,11 +144,6 @@ func run(c *cli.Context) error {
 
 	if !c.Bool("disable-macsync") {
 		macsync.SyncMACAddresses(mClient, dClient)
-	}
-
-	manager, err := network.NewManager(dClient)
-	if err != nil {
-		return err
 	}
 
 	if err := hostports.Watch(mClient, c.String("metadata-address"), c.String("metadata-listen-port")); err != nil {
