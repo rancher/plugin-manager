@@ -24,7 +24,7 @@ import (
 )
 
 const (
-	metadataURLTemplate = "http://%v/2016-07-29"
+	metadataURLTemplate = "http://%v:%v/2016-07-29"
 )
 
 // VERSION of the binary, that can be changed during build
@@ -135,7 +135,7 @@ func run(c *cli.Context) error {
 		return err
 	}
 
-	metadataURL := fmt.Sprintf(metadataURLTemplate, c.String("metadata-address"))
+	metadataURL := fmt.Sprintf(metadataURLTemplate, c.String("metadata-address"), c.String("metadata-listen-port"))
 	logrus.Infof("Waiting for metadata")
 	mClient, err := metadata.NewClientAndWait(metadataURL)
 	if err != nil {
