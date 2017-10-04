@@ -11,6 +11,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/go-rancher-metadata/metadata"
 	"github.com/rancher/plugin-manager/network"
+	"github.com/rancher/plugin-manager/utils"
 	"github.com/vishvananda/netlink"
 )
 
@@ -98,7 +99,7 @@ func (atw *ARPTableWatcher) doSync() error {
 	}
 
 	var lastError error
-	localNetworks, routers, err := network.LocalNetworks(atw.mc)
+	localNetworks, routers, err := utils.GetLocalNetworksAndRoutersFromMetadata(atw.mc)
 	if err != nil {
 		return errors.Wrap(err, "get local networks")
 	}

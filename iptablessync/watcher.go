@@ -207,14 +207,19 @@ func (iptw *IPTablesWatcher) checkAndHookChains() error {
 		e = errors.Wrap(e, err.Error())
 	}
 
-	if err := checkOneHookRule(hookRule{
-		table:    "filter",
-		chain:    "FORWARD",
-		dstChain: "CATTLE_NETWORK_POLICY",
-		spec:     "-j CATTLE_NETWORK_POLICY",
-		num:      "1",
-	}); err != nil {
+	bridgeSubnet, err := iptw.getBridgeSubnet()
+	if err != nil {
 		e = errors.Wrap(e, err.Error())
+	} else {
+		if err := checkOneHookRule(hookRule{
+			table:    "filter",
+			chain:    "FORWARD",
+			dstChain: "CATTLE_NETWORK_POLICY",
+			spec:     fmt.Sprintf("-d %v -s %v -j CATTLE_NETWORK_POLICY", bridgeSubnet, bridgeSubnet),
+			num:      "1",
+		}); err != nil {
+			e = errors.Wrap(e, err.Error())
+		}
 	}
 
 	if err := checkOneHookRule(hookRule{
@@ -228,4 +233,33 @@ func (iptw *IPTablesWatcher) checkAndHookChains() error {
 	}
 
 	return e
+}
+
+func (iptw *IPTablesWatcher) getBridgeSubnet() (string, error) {
+	logrus.Debugf("iptablessync: finding the bridge subnet")
+
+	localNetworks, _, err := utils.GetLocalNetworksAndRoutersFromMetadata(iptw.mc)
+	if err != nil {
+		return "", fmt.Errorf("iptablessync: error fetching local network information: %v", err)
+	}
+
+	if len(localNetworks) == 0 {
+		return "", fmt.Errorf("iptablessync: couldn't find local networks")
+	}
+
+	if len(localNetworks) > 1 {
+		return "", fmt.Errorf("iptablessync: multiple networks in the same environment is not supported yet")
+	}
+
+	host, err := iptw.mc.GetSelfHost()
+	if err != nil {
+		return "", err
+	}
+
+	_, bridgeSubnet := utils.GetBridgeInfo(localNetworks[0], host)
+
+	if bridgeSubnet == "" {
+		return "", fmt.Errorf("no bridge subnet found")
+	}
+	return bridgeSubnet, nil
 }

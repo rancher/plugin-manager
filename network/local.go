@@ -10,60 +10,8 @@ import (
 	"github.com/rancher/go-rancher-metadata/metadata"
 )
 
-func LocalNetworks(mc metadata.Client) ([]metadata.Network, map[string]metadata.Container, error) {
-	networks, err := mc.GetNetworks()
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "error fetching networks from metadata")
-	}
-
-	host, err := mc.GetSelfHost()
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "error fetching self host from metadata")
-	}
-
-	services, err := mc.GetServices()
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "error fetching services from metadata")
-	}
-
-	ret, routers := LocalNetworksByEntries(networks, host, services)
-
-	return ret, routers, nil
-}
-
-func LocalNetworksByEntries(networks []metadata.Network, host metadata.Host, services []metadata.Service) ([]metadata.Network, map[string]metadata.Container) {
-	routers := map[string]metadata.Container{}
-	for _, service := range services {
-		// Trick to select the primary service of the network plugin
-		// stack
-		// TODO: Need to check if it's needed for Calico?
-		if !(service.Kind == "networkDriverService" &&
-			service.Name == service.PrimaryServiceName) {
-			continue
-		}
-
-		for _, aContainer := range service.Containers {
-			if aContainer.HostUUID == host.UUID {
-				routers[aContainer.NetworkUUID] = aContainer
-			}
-		}
-	}
-
-	ret := []metadata.Network{}
-	for _, aNetwork := range networks {
-		if aNetwork.EnvironmentUUID != host.EnvironmentUUID {
-			continue
-		}
-		_, ok := aNetwork.Metadata["cniConfig"].(map[string]interface{})
-		if !ok {
-			continue
-		}
-		ret = append(ret, aNetwork)
-	}
-
-	return ret, routers
-}
-
+// ForEachContainerNS is used to run the given function inside the namespace
+// of all containers that are running
 func ForEachContainerNS(dc *client.Client, mc metadata.Client, networkUUID string, f func(metadata.Container, ns.NetNS) error) error {
 	host, err := mc.GetSelfHost()
 	if err != nil {
@@ -97,6 +45,8 @@ func ForEachContainerNS(dc *client.Client, mc metadata.Client, networkUUID strin
 	return lastError
 }
 
+// EnterNS is used to enter the given network namespace and execute
+// the given function in that namespace.
 func EnterNS(dc *client.Client, dockerID string, f func(ns.NetNS) error) error {
 	inspect, err := dc.ContainerInspect(context.Background(), dockerID)
 	if err != nil {

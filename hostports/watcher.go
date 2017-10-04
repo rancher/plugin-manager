@@ -11,7 +11,6 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/rancher/go-rancher-metadata/metadata"
-	cninetwork "github.com/rancher/plugin-manager/network"
 	"github.com/rancher/plugin-manager/utils"
 )
 
@@ -177,9 +176,9 @@ func (w *watcher) onChange(version string) error {
 	}
 
 	// For iptables filter table rules
-	managedNetworks, _ := cninetwork.LocalNetworksByEntries(networks, host, services)
+	managedNetworks, _ := utils.GetLocalNetworksAndRouters(networks, host, services)
 	for _, n := range managedNetworks {
-		bridge, bridgeSubnet := getBridgeInfo(n, host)
+		bridge, bridgeSubnet := utils.GetBridgeInfo(n, host)
 		if bridge != "" && bridgeSubnet != "" {
 			newFilterRules[n.UUID] = parseFilterRule(bridge, bridgeSubnet)
 		}
@@ -198,7 +197,7 @@ func (w *watcher) onChange(version string) error {
 			continue
 		}
 
-		bridge, _ := getBridgeInfo(network, host)
+		bridge, _ := utils.GetBridgeInfo(network, host)
 
 		for _, port := range container.Ports {
 			rule, ok := parsePortRule(bridge, host.AgentIP, container.PrimaryIp, port)
@@ -341,21 +340,4 @@ func setupKernelParameters() error {
 	}
 	logrus.Debugf("Running %s, output: %s", s, outBuf.String())
 	return nil
-}
-
-func getBridgeInfo(network metadata.Network, host metadata.Host) (bridge string, bridgeSubnet string) {
-	conf, _ := network.Metadata["cniConfig"].(map[string]interface{})
-	for _, file := range conf {
-		file = utils.UpdateCNIConfigByKeywords(file, host)
-		props, _ := file.(map[string]interface{})
-		cniType, _ := props["type"].(string)
-		checkBridge, _ := props["bridge"].(string)
-		bridgeSubnet, _ = props["bridgeSubnet"].(string)
-
-		if cniType == "rancher-bridge" && checkBridge != "" {
-			bridge = checkBridge
-			break
-		}
-	}
-	return bridge, bridgeSubnet
 }

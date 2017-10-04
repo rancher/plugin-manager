@@ -12,6 +12,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/go-rancher-metadata/metadata"
 	"github.com/rancher/plugin-manager/network"
+	"github.com/rancher/plugin-manager/utils"
 	"github.com/vishvananda/netlink"
 )
 
@@ -62,7 +63,7 @@ func (ms *MACSyncer) syncNTimes() {
 func (ms *MACSyncer) doSync() (bool, error) {
 	didSomething := false
 
-	networks, routers, err := network.LocalNetworks(ms.mc)
+	networks, routers, err := utils.GetLocalNetworksAndRoutersFromMetadata(ms.mc)
 	if err != nil {
 		return didSomething, errors.Wrap(err, "getting local networks")
 	}

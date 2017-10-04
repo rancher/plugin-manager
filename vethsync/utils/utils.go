@@ -13,6 +13,7 @@ import (
 	//"github.com/pkg/errors"
 	"github.com/rancher/go-rancher-metadata/metadata"
 	"github.com/rancher/plugin-manager/network"
+	"github.com/rancher/plugin-manager/utils"
 	"github.com/vishvananda/netlink"
 )
 
@@ -27,7 +28,7 @@ func GetHostViewVethMap(vethPrefix string, mc metadata.Client) (map[string]*netl
 		return nil, err
 	}
 
-	localNetworks, _, err := network.LocalNetworks(mc)
+	localNetworks, _, err := utils.GetLocalNetworksAndRoutersFromMetadata(mc)
 	if err != nil {
 		logrus.Errorf("vethsync/utils: error fetching local networks: %v", err)
 		return nil, err
