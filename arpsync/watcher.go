@@ -77,7 +77,7 @@ func buildContainersMap(containers []metadata.Container,
 	for index, aContainer := range containers {
 		if !(aContainer.PrimaryIp != "" &&
 			aContainer.PrimaryMacAddress != "" &&
-			(aContainer.State == "running" || aContainer.State == "starting") &&
+			utils.IsContainerConsideredRunning(aContainer) &&
 			aContainer.NetworkUUID == network.UUID) {
 			continue
 		}

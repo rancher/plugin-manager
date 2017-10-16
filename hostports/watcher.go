@@ -187,7 +187,7 @@ func (w *watcher) onChange(version string) error {
 	for _, container := range containers {
 		network := networksMap[container.NetworkUUID]
 
-		if container.State != "running" && container.State != "starting" {
+		if !utils.IsContainerConsideredRunning(container) {
 			continue
 		}
 
