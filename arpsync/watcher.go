@@ -11,6 +11,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/go-rancher-metadata/metadata"
 	"github.com/rancher/plugin-manager/network"
+	"github.com/rancher/plugin-manager/utils"
 	"github.com/vishvananda/netlink"
 )
 
@@ -76,7 +77,7 @@ func buildContainersMap(containers []metadata.Container,
 	for index, aContainer := range containers {
 		if !(aContainer.PrimaryIp != "" &&
 			aContainer.PrimaryMacAddress != "" &&
-			(aContainer.State == "running" || aContainer.State == "starting") &&
+			utils.IsContainerConsideredRunning(aContainer) &&
 			aContainer.NetworkUUID == network.UUID) {
 			continue
 		}

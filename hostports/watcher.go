@@ -12,6 +12,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/pkg/errors"
 	"github.com/rancher/go-rancher-metadata/metadata"
+	"github.com/rancher/plugin-manager/utils"
 )
 
 var (
@@ -180,7 +181,7 @@ func (w *watcher) onChange(version string) error {
 		network := networks[container.NetworkUUID]
 		bridge := ""
 
-		if container.State != "running" && container.State != "starting" {
+		if !utils.IsContainerConsideredRunning(container) {
 			continue
 		}
 

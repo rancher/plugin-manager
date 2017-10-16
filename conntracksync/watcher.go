@@ -8,6 +8,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/rancher/go-rancher-metadata/metadata"
 	"github.com/rancher/plugin-manager/conntracksync/conntrack"
+	"github.com/rancher/plugin-manager/utils"
 )
 
 var (
@@ -138,7 +139,7 @@ func (ctw *ConntrackTableWatcher) buildContainersMaps() (
 	containersMap := make(map[string]*metadata.Container)
 	for index, aContainer := range containers {
 		if !(aContainer.HostUUID == host.UUID &&
-			(aContainer.State == "running" || aContainer.State == "starting") &&
+			utils.IsContainerConsideredRunning(aContainer) &&
 			len(aContainer.Ports) > 0) {
 			continue
 		}
