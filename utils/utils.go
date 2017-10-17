@@ -3,6 +3,7 @@ package utils
 import (
 	"strings"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/rancher/go-rancher-metadata/metadata"
 )
 
@@ -62,19 +63,35 @@ func GetBridgeInfo(network metadata.Network, host metadata.Host) (bridge string,
 // related to that networks running in the current environment
 func GetLocalNetworksAndRouters(networks []metadata.Network, host metadata.Host, services []metadata.Service) ([]metadata.Network, map[string]metadata.Container) {
 	localRouters := map[string]metadata.Container{}
+	var cniDriverServices []metadata.Service
+	var networkService metadata.Service
+	// Trick to select the primary service of the network plugin
+	// stack
+	// TODO: Need to check if it's needed for Calico?
 	for _, service := range services {
-		// Trick to select the primary service of the network plugin
-		// stack
-		// TODO: Need to check if it's needed for Calico?
-		if !(service.Kind == "networkDriverService" &&
-			service.Name == service.PrimaryServiceName) {
-			continue
+		if service.Kind == "networkDriverService" {
+			cniDriverServices = append(cniDriverServices, service)
 		}
+	}
 
-		for _, aContainer := range service.Containers {
-			if aContainer.HostUUID == host.UUID {
-				localRouters[aContainer.NetworkUUID] = aContainer
+	if len(cniDriverServices) != 1 {
+		logrus.Errorf("utils: error: expected one CNI driver service, but found: %v", len(cniDriverServices))
+	}
+
+	if len(cniDriverServices) > 0 {
+		// Find the other service in the same stack as cniDriver
+		for _, service := range services {
+			if service.StackUUID == cniDriverServices[0].StackUUID &&
+				service.UUID != cniDriverServices[0].UUID {
+				networkService = service
+				break
 			}
+		}
+	}
+
+	for _, aContainer := range networkService.Containers {
+		if aContainer.HostUUID == host.UUID {
+			localRouters[aContainer.NetworkUUID] = aContainer
 		}
 	}
 
