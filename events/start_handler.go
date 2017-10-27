@@ -67,6 +67,11 @@ func getDNSSearch(container *docker.Container) []string {
 
 func setupResolvConf(container *docker.Container) error {
 	log.Debugf("setupResolvConf for container: %+v", container)
+	if container.ResolvConfPath == "" {
+		log.Debugf("container.ResolvConfPath is not set for container: %v", container.ID)
+		return nil
+	}
+
 	if container.ResolvConfPath == "/etc/resolv.conf" {
 		// Don't shoot ourself in the foot and change our own DNS
 		log.Debugf("resolv.conf already set for container: %v, skipping", container.ID)

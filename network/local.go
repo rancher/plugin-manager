@@ -3,6 +3,7 @@ package network
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/containernetworking/cni/pkg/ns"
 	"github.com/docker/engine-api/client"
@@ -47,10 +48,16 @@ func ForEachContainerNS(dc *client.Client, mc metadata.Client, networkUUID strin
 
 // EnterNS is used to enter the given network namespace and execute
 // the given function in that namespace.
+// Runs only if the container is not using host namespace or
+// another contaienr's namespace.
 func EnterNS(dc *client.Client, dockerID string, f func(ns.NetNS) error) error {
 	inspect, err := dc.ContainerInspect(context.Background(), dockerID)
 	if err != nil {
 		return errors.Wrapf(err, "inspecting container: %v", dockerID)
+	}
+	if inspect.HostConfig != nil && (string(inspect.HostConfig.NetworkMode) == "host" ||
+		strings.HasPrefix(string(inspect.HostConfig.NetworkMode), "container")) {
+		return nil
 	}
 
 	containerNSStr := fmt.Sprintf("/proc/%v/ns/net", inspect.State.Pid)

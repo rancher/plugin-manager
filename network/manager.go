@@ -167,8 +167,12 @@ func (n *Manager) networkDown(id string, inspect types.ContainerJSON) error {
 }
 
 func configureNetwork(inspect *types.ContainerJSON) bool {
+	logrus.Debugf("inpect.HostConfig: %+v inpect.Config: %+v inpect.NetworkSettings: %+v",
+		*inspect.HostConfig, *inspect.Config, *inspect.NetworkSettings)
 	net, ok := inspect.Config.Labels[CNILabel]
-	if !ok && (inspect.Config.Labels[LegacyManagedNetLabel] == "true" || inspect.Config.Labels[IPLabel] != "") {
+	if !ok &&
+		!(string(inspect.HostConfig.NetworkMode) == "host" || strings.HasPrefix(string(inspect.HostConfig.NetworkMode), "container")) &&
+		(inspect.Config.Labels[LegacyManagedNetLabel] == "true" || inspect.Config.Labels[IPLabel] != "") {
 		net = "managed"
 	}
 
