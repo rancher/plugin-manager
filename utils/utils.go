@@ -63,16 +63,27 @@ func GetBridgeInfo(network metadata.Network, host metadata.Host) (bridge string,
 // related to that networks running in the current environment
 func GetLocalNetworksAndRouters(networks []metadata.Network, host metadata.Host, services []metadata.Service) ([]metadata.Network, map[string]metadata.Container) {
 	localRouters := map[string]metadata.Container{}
-	var cniDriverServices []metadata.Service
+	var cniDriverServices, unfilteredCniDriverServices []metadata.Service
 	var networkService metadata.Service
 	// Trick to select the primary service of the network plugin
 	// stack
 	// TODO: Need to check if it's needed for Calico?
 	for _, service := range services {
 		if service.Kind == "networkDriverService" {
+			unfilteredCniDriverServices = append(unfilteredCniDriverServices, service)
+		}
+	}
+
+	if len(unfilteredCniDriverServices) != 1 {
+		logrus.Debugf("found multiple cni driver services, filtering. unfilteredCniDriverServices=%v", unfilteredCniDriverServices)
+		for _, service := range unfilteredCniDriverServices {
+			if service.Name != "cni-driver" {
+				continue
+			}
 			cniDriverServices = append(cniDriverServices, service)
 		}
 	}
+	logrus.Debugf("after filtering cniDriverServices=%v", cniDriverServices)
 
 	if len(cniDriverServices) != 1 {
 		logrus.Errorf("utils: error: expected one CNI driver service, but found: %v", len(cniDriverServices))
@@ -107,6 +118,7 @@ func GetLocalNetworksAndRouters(networks []metadata.Network, host metadata.Host,
 		localNetworks = append(localNetworks, aNetwork)
 	}
 
+	logrus.Debugf("localNetworks=%v, localRouters=%v", localNetworks, localRouters)
 	return localNetworks, localRouters
 }
 

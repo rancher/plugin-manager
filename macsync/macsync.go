@@ -43,7 +43,9 @@ func SyncMACAddresses(mc metadata.Client, dockerClient *client.Client) {
 }
 
 func (ms *MACSyncer) syncNTimes() {
+	logrus.Debugf("macsync: start sync %v times", N)
 	for {
+		logrus.Debugf("macsync: syncing for first time")
 		if done, err := ms.doSync(); err != nil {
 			logrus.Errorf("macsync: error syncing MAC addresses for the first tiime: %v", err)
 		} else if done {
@@ -54,6 +56,7 @@ func (ms *MACSyncer) syncNTimes() {
 
 	for i := 0; i < N; i++ {
 		time.Sleep(syncInterval)
+		logrus.Debugf("macsync: syncing i=%v time", i)
 		if _, err := ms.doSync(); err != nil {
 			logrus.Errorf("macsync: i: %v, error syncing MAC addresses: %v", i, err)
 		}
@@ -76,6 +79,7 @@ func (ms *MACSyncer) doSync() (bool, error) {
 
 		didSomething = true
 		err := network.ForEachContainerNS(ms.dc, ms.mc, n.UUID, func(aContainer metadata.Container, _ ns.NetNS) error {
+			logrus.Debugf("macsync: aContainer: %v", aContainer)
 			l, err := netlink.LinkByName("eth0")
 			if err != nil {
 				logrus.Errorf("macsync: for container: %v, could not lookup interface: %v",
@@ -102,6 +106,7 @@ func (ms *MACSyncer) doSync() (bool, error) {
 			lastError = err
 		}
 	}
+	logrus.Debugf("macsync: didSomething=%v", didSomething)
 
 	return didSomething, lastError
 }

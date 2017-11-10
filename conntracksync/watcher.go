@@ -29,7 +29,7 @@ type ConntrackTableWatcher struct {
 // Watch starts the go routine to periodically check the conntrack table
 // for any discrepancies
 func Watch(syncIntervalStr string, mc metadata.Client) error {
-	logrus.Debugf("ctsync: syncIntervalStr: %v", syncIntervalStr)
+	logrus.Debugf("conntracksync: syncIntervalStr: %v", syncIntervalStr)
 
 	syncInterval := DefaultSyncInterval
 	if i, err := strconv.Atoi(syncIntervalStr); err == nil {
@@ -48,15 +48,15 @@ func Watch(syncIntervalStr string, mc metadata.Client) error {
 }
 
 func (ctw *ConntrackTableWatcher) onChangeNoError(version string) {
-	logrus.Debugf("ctsync: metadata version: %v, lastApplied: %v", version, ctw.lastApplied)
+	logrus.Debugf("conntracksync: metadata version: %v, lastApplied: %v", version, ctw.lastApplied)
 	timeSinceLastApplied := time.Now().Sub(ctw.lastApplied)
 	if timeSinceLastApplied < ctw.syncInterval {
 		timeToSleep := ctw.syncInterval - timeSinceLastApplied
-		logrus.Debugf("ctsync: sleeping for %v", timeToSleep)
+		logrus.Debugf("conntracksync: sleeping for %v", timeToSleep)
 		time.Sleep(timeToSleep)
 	}
 	if err := ctw.doSync(); err != nil {
-		logrus.Errorf("ctsync: while syncing, got error: %v", err)
+		logrus.Errorf("conntracksync: while syncing, got error: %v", err)
 	}
 	ctw.lastApplied = time.Now()
 }

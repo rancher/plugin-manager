@@ -152,7 +152,7 @@ func syncArpTable(context string, networkDriverMacAddress string, containersMap 
 	if context != "host" {
 		link, err := netlink.LinkByName("eth0")
 		if err != nil {
-			logrus.Errorf("arpsync: error fetching eth0 link for %v: %v", context, err)
+			logrus.Errorf("arpsync): error fetching eth0 link for %v: %v", context, err)
 			return err
 		}
 		linkIndex = link.Attrs().Index
@@ -160,10 +160,10 @@ func syncArpTable(context string, networkDriverMacAddress string, containersMap 
 	// Read the ARP table
 	entries, err := netlink.NeighList(linkIndex, netlink.FAMILY_V4)
 	if err != nil {
-		logrus.Errorf("arpsync: error fetching entries from ARP table")
+		logrus.Errorf("arpsync(%v): error fetching entries from ARP table", context)
 		return err
 	}
-	logrus.Debugf("arpsync: entries=%+v", entries)
+	logrus.Debugf("arpsync(%v): entries=%+v", context, entries)
 
 	for _, aEntry := range entries {
 		if container, found := containersMap[aEntry.IP.String()]; found {
@@ -177,7 +177,7 @@ func syncArpTable(context string, networkDriverMacAddress string, containersMap 
 				fixARPEntry(aEntry, expected)
 			}
 		} else {
-			logrus.Debugf("arpsync: container not found for ARP entry: %+v", aEntry)
+			logrus.Debugf("arpsync(%v): container not found for ARP entry: %+v", context, aEntry)
 		}
 	}
 
