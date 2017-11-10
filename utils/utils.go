@@ -82,8 +82,10 @@ func GetLocalNetworksAndRouters(networks []metadata.Network, host metadata.Host,
 			}
 			cniDriverServices = append(cniDriverServices, service)
 		}
+	} else {
+		cniDriverServices = unfilteredCniDriverServices
 	}
-	logrus.Debugf("after filtering cniDriverServices=%v", cniDriverServices)
+	logrus.Debugf("cniDriverServices=%v", cniDriverServices)
 
 	if len(cniDriverServices) != 1 {
 		logrus.Errorf("utils: error: expected one CNI driver service, but found: %v", len(cniDriverServices))
@@ -93,7 +95,8 @@ func GetLocalNetworksAndRouters(networks []metadata.Network, host metadata.Host,
 		// Find the other service in the same stack as cniDriver
 		for _, service := range services {
 			if service.StackUUID == cniDriverServices[0].StackUUID &&
-				service.UUID != cniDriverServices[0].UUID {
+				service.UUID != cniDriverServices[0].UUID &&
+				service.Name == service.PrimaryServiceName {
 				networkService = service
 				break
 			}

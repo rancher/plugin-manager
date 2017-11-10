@@ -104,6 +104,8 @@ func (atw *ARPTableWatcher) doSync() error {
 		return errors.Wrap(err, "get local networks")
 	}
 
+	logrus.Debugf("arpsync: atw.knownRouters=%v", atw.knownRouters)
+
 	for _, localNetwork := range localNetworks {
 		if routers[localNetwork.UUID].Labels[syncLabel] != "true" {
 			continue
@@ -126,15 +128,17 @@ func (atw *ARPTableWatcher) doSync() error {
 
 		if atw.knownRouters[localNetwork.UUID].PrimaryMacAddress != networkDriverMacAddress || atw.routerApplyTries < 10 {
 			if atw.knownRouters[localNetwork.UUID].PrimaryMacAddress != networkDriverMacAddress {
+				logrus.Debugf("arpsync: network router mac address changed from=%v to=%v", atw.knownRouters[localNetwork.UUID].PrimaryMacAddress, networkDriverMacAddress)
 				atw.routerApplyTries = 0
 			}
 
 			atw.routerApplyTries++
-			logrus.Infof("Network router changed, syncing ARP tables %d/10 in containers, new MAC: %v", atw.routerApplyTries, networkDriverMacAddress)
+			logrus.Infof("arpsync: Network router changed, syncing ARP tables %d/10 in containers, new MAC: %v", atw.routerApplyTries, networkDriverMacAddress)
 			err := network.ForEachContainerNS(atw.dc, atw.mc, localNetwork.UUID, func(container metadata.Container, _ ns.NetNS) error {
 				return syncArpTable(container.ExternalId, networkDriverMacAddress, containersMap, host)
 			})
 			if err != nil {
+				logrus.Errorf("arpsync: got error while syncing arp tables for containers=%v", err)
 				lastError = err
 			}
 		}
