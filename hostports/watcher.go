@@ -30,7 +30,7 @@ func Watch(c metadata.Client, metadataAddress, metadataListenPort string) error 
 	}
 
 	if err := setupKernelParameters(); err != nil {
-		logrus.Errorf("error: %v", err)
+		logrus.Errorf("hostports: error: %v", err)
 	}
 
 	go c.OnChange(5, w.onChangeNoError)
@@ -133,7 +133,7 @@ func (p PortRule) natIptables() []byte {
 }
 
 func (w *watcher) run(args ...string) error {
-	logrus.Debugf("Running %s", strings.Join(args, " "))
+	logrus.Debugf("hostports: Running %s", strings.Join(args, " "))
 	cmd := exec.Command(args[0], args[1:]...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -142,12 +142,12 @@ func (w *watcher) run(args ...string) error {
 
 func (w *watcher) onChangeNoError(version string) {
 	if err := w.onChange(version); err != nil {
-		logrus.Errorf("Failed to apply host rules: %v", err)
+		logrus.Errorf("hostports:  Failed to apply host rules: %v", err)
 	}
 }
 
 func (w *watcher) onChange(version string) error {
-	logrus.Debug("Creating rule set")
+	logrus.Debug("hostports:  Creating rule set")
 	newPortRules := map[string]PortRule{}
 	newFilterRules := map[string]FilterRule{}
 
@@ -209,15 +209,15 @@ func (w *watcher) onChange(version string) error {
 		}
 	}
 
-	logrus.Debugf("New generated rules: %v", newPortRules)
+	logrus.Debugf("hostports:  New generated rules: %v", newPortRules)
 	if !reflect.DeepEqual(w.appliedPortRules, newPortRules) || !reflect.DeepEqual(w.appliedFilterRules, newFilterRules) {
-		logrus.Infof("Applying new rules")
+		logrus.Infof("hostports: : Applying new rules")
 		return w.apply(newPortRules, newFilterRules)
 	} else if time.Now().Sub(w.lastApplied) > reapplyEvery {
 		return w.apply(newPortRules, newFilterRules)
 	}
 
-	logrus.Debugf("No change in applied rules")
+	logrus.Debugf("hostports: No change in applied rules")
 	return nil
 }
 
@@ -268,7 +268,7 @@ func (w *watcher) apply(prules map[string]PortRule, frules map[string]FilterRule
 	buf.WriteString("\nCOMMIT\n")
 
 	if logrus.GetLevel() == logrus.DebugLevel {
-		fmt.Printf("Applying rules\n%s", buf)
+		fmt.Printf("hostports: Applying rules --- start\n%s\nhostports: Applying rules --- end\n", buf)
 	}
 
 	cmd := exec.Command("iptables-restore", "-n")
@@ -276,7 +276,7 @@ func (w *watcher) apply(prules map[string]PortRule, frules map[string]FilterRule
 	cmd.Stdout = os.Stdout
 	cmd.Stdin = buf
 	if err := cmd.Run(); err != nil {
-		logrus.Errorf("Failed to apply rules\n%s", buf)
+		fmt.Printf("hostports: failed to apply rules --- start\n%s\nhostports: failed to apply rules --- end\n", buf)
 		return err
 	}
 
@@ -335,9 +335,9 @@ func setupKernelParameters() error {
 	var outBuf bytes.Buffer
 	cmd.Stdout = &outBuf
 	if err := cmd.Run(); err != nil {
-		logrus.Errorf("error setting up kernel parameters: %v", err)
+		logrus.Errorf("hostports:  error setting up kernel parameters: %v", err)
 		return err
 	}
-	logrus.Debugf("Running %s, output: %s", s, outBuf.String())
+	logrus.Debugf("hostports:  Running %s, output: %s", s, outBuf.String())
 	return nil
 }

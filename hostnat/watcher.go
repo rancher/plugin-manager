@@ -45,7 +45,7 @@ type MASQRule struct {
 func (p MASQRule) iptables() []byte {
 	_, err := exec.Command("/sbin/ipset", "create", "--exist", disableHostNatIPset, "hash:net").CombinedOutput()
 	if err != nil {
-		logrus.Errorf("Failed to create ipset: %v", err)
+		logrus.Errorf("hostnat: Failed to create ipset: %v", err)
 	}
 	buf := &bytes.Buffer{}
 	buf.WriteString(fmt.Sprintf("-A CATTLE_NAT_POSTROUTING -d %s -s %s -j ACCEPT\n", os.Getenv("METADATA_IP"), p.Subnet))
@@ -68,7 +68,7 @@ func (p MASQRule) localRoutingSetting() string {
 }
 
 func (w *watcher) run(args ...string) error {
-	logrus.Debugf("Running %s", strings.Join(args, " "))
+	logrus.Debugf("hostnat: Running %s", strings.Join(args, " "))
 	cmd := exec.Command(args[0], args[1:]...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -77,12 +77,12 @@ func (w *watcher) run(args ...string) error {
 
 func (w *watcher) onChangeNoError(version string) {
 	if err := w.onChange(version); err != nil {
-		logrus.Errorf("Failed to apply host rules: %v", err)
+		logrus.Errorf("hostnat: Failed to apply host rules: %v", err)
 	}
 }
 
 func (w *watcher) onChange(version string) error {
-	logrus.Debug("Evaluating NAT host rules")
+	logrus.Debug("hostnat: Evaluating NAT host rules")
 	newRules := map[string]MASQRule{}
 
 	networks, err := w.c.GetNetworks()
@@ -102,15 +102,15 @@ func (w *watcher) onChange(version string) error {
 		}
 	}
 
-	logrus.Debugf("New generated nat rules: %v", newRules)
+	logrus.Debugf("hostnat: New generated nat rules: %v", newRules)
 	if !reflect.DeepEqual(w.applied, newRules) {
-		logrus.Infof("Applying new nat rules")
+		logrus.Infof("hostnat: Applying new nat rules")
 		return w.apply(newRules)
 	} else if time.Now().Sub(w.lastApplied) > reapplyEvery {
 		return w.apply(newRules)
 	}
 
-	logrus.Debugf("No change in applied nat rules")
+	logrus.Debugf("hostnat: No change in applied nat rules")
 	return nil
 }
 
@@ -139,15 +139,15 @@ func (w *watcher) enableLocalNetRouting(rules map[string]MASQRule) error {
 	for _, rule := range rules {
 		s := rule.localRoutingSetting()
 		if s != "" {
-			logrus.Debugf("s: %v", s)
+			logrus.Debugf("hostnat: s: %v", s)
 			cmd := exec.Command("sysctl", "-w", s)
 			var outBuf bytes.Buffer
 			cmd.Stdout = &outBuf
 			if err := cmd.Run(); err != nil {
-				logrus.Errorf("error enabling local net routing: %v", err)
+				logrus.Errorf("hostnat:  error enabling local net routing: %v", err)
 				return err
 			}
-			logrus.Debugf("Running %s, output: %s", s, outBuf.String())
+			logrus.Debugf("hostnat: Running %s, output: %s", s, outBuf.String())
 		}
 	}
 
@@ -171,7 +171,7 @@ func (w *watcher) apply(rules map[string]MASQRule) error {
 	buf.WriteString("\nCOMMIT\n")
 
 	if logrus.GetLevel() == logrus.DebugLevel {
-		fmt.Printf("Applying rules\n%s", buf)
+		fmt.Printf("hostnat: Applying rules --- start\n%s\nhostnat: Applying rules --- end\n", buf)
 	}
 
 	cmd := exec.Command("iptables-restore", "-n")
@@ -179,7 +179,7 @@ func (w *watcher) apply(rules map[string]MASQRule) error {
 	cmd.Stdout = os.Stdout
 	cmd.Stdin = buf
 	if err := cmd.Run(); err != nil {
-		logrus.Errorf("Failed to apply rules\n%s", buf)
+		fmt.Printf("hostnat: failed to apply rules --- start\n%s\nhostnat: failed to apply rules --- end\n", buf)
 		return err
 	}
 

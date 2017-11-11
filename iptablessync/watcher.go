@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/pkg/errors"
 	"github.com/rancher/go-rancher-metadata/metadata"
 	"github.com/rancher/plugin-manager/utils"
 )
@@ -115,8 +114,8 @@ func (iptw *IPTablesWatcher) createChains() error {
 }
 
 func checkOneHookRule(rule hookRule) error {
-	var e error
 	var cmd string
+	hasErrored := false
 
 	install := false
 	cmd = fmt.Sprintf("iptables -w -t %v -C %v %v", rule.table, rule.chain, rule.spec)
@@ -129,7 +128,7 @@ func checkOneHookRule(rule hookRule) error {
 		output := string(outputBytes)
 		if err != nil {
 			logrus.Errorf("error running cmd: %v: %v", cmd, err)
-			e = errors.Wrap(e, err.Error())
+			hasErrored = true
 		} else {
 			expected := fmt.Sprintf("-A %v %v\n", rule.chain, rule.spec)
 			if output != expected {
@@ -137,7 +136,8 @@ func checkOneHookRule(rule hookRule) error {
 				logrus.Infof("iptablessync: fixing order for %v chain", rule.dstChain)
 				cmd = fmt.Sprintf("iptables -w -t %v -D %v %v", rule.table, rule.chain, rule.spec)
 				if err := utils.RunNoStdoutNoStderr(cmd); err != nil {
-					e = errors.Wrap(e, err.Error())
+					logrus.Errorf("iptablessync: error running cmd: %v: %v", cmd, err)
+					hasErrored = true
 				}
 				install = true
 			}
@@ -147,92 +147,109 @@ func checkOneHookRule(rule hookRule) error {
 		cmd = fmt.Sprintf("iptables -w -t %v -I %v %v %v", rule.table, rule.chain, rule.num, rule.spec)
 		logrus.Infof("iptablessync: installing cmd: %v", cmd)
 		if err := utils.RunNoStdoutNoStderr(cmd); err != nil {
-			e = errors.Wrap(e, err.Error())
+			logrus.Errorf("error running cmd: %v: %v", cmd, err)
+			hasErrored = true
 		}
 	}
 
-	return e
+	if hasErrored {
+		return fmt.Errorf("error while checking one hook rule")
+	}
+	return nil
 }
 
 func (iptw *IPTablesWatcher) checkAndHookChains() error {
-	var e error
+	var err error
+	hasErrored := false
 
-	if err := checkOneHookRule(hookRule{
+	if err = checkOneHookRule(hookRule{
 		table:    "raw",
 		chain:    "PREROUTING",
 		dstChain: "CATTLE_RAW_PREROUTING",
 		spec:     "-m addrtype --dst-type LOCAL -j CATTLE_RAW_PREROUTING",
 		num:      "1",
 	}); err != nil {
-		e = errors.Wrap(e, err.Error())
+		hasErrored = true
+		logrus.Errorf("iptablessync: err=%v", err)
 	}
 
-	if err := checkOneHookRule(hookRule{
+	if err = checkOneHookRule(hookRule{
 		table:    "nat",
 		chain:    "PREROUTING",
 		dstChain: "CATTLE_PREROUTING",
 		spec:     "-m addrtype --dst-type LOCAL -j CATTLE_PREROUTING",
 		num:      "1",
 	}); err != nil {
-		e = errors.Wrap(e, err.Error())
+		hasErrored = true
+		logrus.Errorf("iptablessync: err=%v", err)
 	}
 
-	if err := checkOneHookRule(hookRule{
+	if err = checkOneHookRule(hookRule{
 		table:    "nat",
 		chain:    "OUTPUT",
 		dstChain: "CATTLE_OUTPUT",
 		spec:     "-m addrtype --dst-type LOCAL -j CATTLE_OUTPUT",
 		num:      "1",
 	}); err != nil {
-		e = errors.Wrap(e, err.Error())
+		hasErrored = true
+		logrus.Errorf("iptablessync: err=%v", err)
 	}
 
-	if err := checkOneHookRule(hookRule{
+	if err = checkOneHookRule(hookRule{
 		table:    "nat",
 		chain:    "POSTROUTING",
 		dstChain: "CATTLE_NAT_POSTROUTING",
 		spec:     "-j CATTLE_NAT_POSTROUTING",
 		num:      "1",
 	}); err != nil {
-		e = errors.Wrap(e, err.Error())
+		hasErrored = true
+		logrus.Errorf("iptablessync: err=%v", err)
 	}
 
-	if err := checkOneHookRule(hookRule{
+	if err = checkOneHookRule(hookRule{
 		table:    "nat",
 		chain:    "POSTROUTING",
 		dstChain: "CATTLE_HOSTPORTS_POSTROUTING",
 		spec:     "-j CATTLE_HOSTPORTS_POSTROUTING",
 		num:      "2",
 	}); err != nil {
-		e = errors.Wrap(e, err.Error())
+		hasErrored = true
+		logrus.Errorf("iptablessync: err=%v", err)
 	}
 
 	bridgeSubnet, err := iptw.getBridgeSubnet()
 	if err != nil {
-		e = errors.Wrap(e, err.Error())
+		hasErrored = true
+		logrus.Errorf("iptablessync: error fetching bridgeSubnet: %v", err)
 	} else {
-		if err := checkOneHookRule(hookRule{
+		logrus.Debugf("iptablessync: bridgeSubnet=%v", bridgeSubnet)
+		if err = checkOneHookRule(hookRule{
 			table:    "filter",
 			chain:    "FORWARD",
 			dstChain: "CATTLE_NETWORK_POLICY",
-			spec:     fmt.Sprintf("-d %v -s %v -j CATTLE_NETWORK_POLICY", bridgeSubnet, bridgeSubnet),
+			spec:     fmt.Sprintf("-s %v -d %v -j CATTLE_NETWORK_POLICY", bridgeSubnet, bridgeSubnet),
 			num:      "1",
 		}); err != nil {
-			e = errors.Wrap(e, err.Error())
+			hasErrored = true
+			logrus.Errorf("iptablessync: err=%v", err)
 		}
 	}
 
-	if err := checkOneHookRule(hookRule{
+	if err = checkOneHookRule(hookRule{
 		table:    "filter",
 		chain:    "FORWARD",
 		dstChain: "CATTLE_FORWARD",
 		spec:     "-j CATTLE_FORWARD",
 		num:      "2",
 	}); err != nil {
-		e = errors.Wrap(e, err.Error())
+		hasErrored = true
+		logrus.Errorf("iptablessync: err=%v", err)
 	}
 
-	return e
+	if hasErrored {
+		return fmt.Errorf("error checking and hooking chains")
+	}
+	return nil
 }
 
 func (iptw *IPTablesWatcher) getBridgeSubnet() (string, error) {

@@ -147,7 +147,7 @@ func run(c *cli.Context) error {
 	}
 
 	if err := iptablessync.Watch(c.Int("iptables-sync-interval"), mClient); err != nil {
-		logrus.Errorf("Failed to start host ports configuration: %v", err)
+		logrus.Errorf("Failed to start iptablessync: %v", err)
 	}
 
 	if err := hostports.Watch(mClient, c.String("metadata-address"), c.String("metadata-listen-port")); err != nil {

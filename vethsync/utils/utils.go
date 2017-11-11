@@ -27,6 +27,7 @@ func GetHostViewVethMap(vethPrefix string, mc metadata.Client) (map[string]*netl
 		logrus.Errorf("vethsync/utils: error getting links: %v", err)
 		return nil, err
 	}
+	logrus.Debugf("vethsync/utils: alllinks: %v", alllinks)
 
 	localNetworks, _, err := utils.GetLocalNetworksAndRoutersFromMetadata(mc)
 	if err != nil {
@@ -51,6 +52,7 @@ func GetHostViewVethMap(vethPrefix string, mc metadata.Client) (map[string]*netl
 		}
 		localBridges[b] = true
 	}
+	logrus.Debugf("localBridges: %v", localBridges)
 
 	localBridgesLinksMap := make(map[int]*netlink.Link)
 	for index, l := range alllinks {
