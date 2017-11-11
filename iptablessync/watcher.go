@@ -43,7 +43,6 @@ func Watch(syncInterval int, mc metadata.Client) error {
 
 	if err := iptw.runFirstTime(); err != nil {
 		logrus.Errorf("iptablessync: error running first time: %v", err)
-		return err
 	}
 
 	go iptw.doSync()
@@ -66,12 +65,6 @@ func (iptw *IPTablesWatcher) runFirstTime() error {
 	// Create the chains
 	if err := iptw.createChains(); err != nil {
 		logrus.Errorf("iptablessync: error creating chains: %v", err)
-		return err
-	}
-
-	// check and hook chains
-	if err := iptw.checkAndHookChains(); err != nil {
-		logrus.Errorf("iptablessync: error while checkAndHookChains: %v", err)
 		return err
 	}
 
