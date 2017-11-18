@@ -3,7 +3,7 @@ package utils
 import (
 	"strings"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/leodotcloud/log"
 	"github.com/rancher/go-rancher-metadata/metadata"
 )
 
@@ -75,7 +75,7 @@ func GetLocalNetworksAndRouters(networks []metadata.Network, host metadata.Host,
 	}
 
 	if len(unfilteredCniDriverServices) != 1 {
-		logrus.Debugf("found multiple cni driver services, filtering. unfilteredCniDriverServices=%v", unfilteredCniDriverServices)
+		log.Debugf("found multiple cni driver services, filtering. unfilteredCniDriverServices=%v", unfilteredCniDriverServices)
 		for _, service := range unfilteredCniDriverServices {
 			if service.Name != "cni-driver" {
 				continue
@@ -85,10 +85,10 @@ func GetLocalNetworksAndRouters(networks []metadata.Network, host metadata.Host,
 	} else {
 		cniDriverServices = unfilteredCniDriverServices
 	}
-	logrus.Debugf("cniDriverServices=%v", cniDriverServices)
+	log.Debugf("cniDriverServices=%v", cniDriverServices)
 
 	if len(cniDriverServices) != 1 {
-		logrus.Errorf("utils: error: expected one CNI driver service, but found: %v", len(cniDriverServices))
+		log.Errorf("utils: error: expected one CNI driver service, but found: %v", len(cniDriverServices))
 	}
 
 	if len(cniDriverServices) > 0 {
@@ -129,7 +129,7 @@ func GetLocalNetworksAndRouters(networks []metadata.Network, host metadata.Host,
 		localNetworks = append(localNetworks, aNetwork)
 	}
 
-	logrus.Debugf("localNetworks=%v, localRouters=%v", localNetworks, localRouters)
+	log.Debugf("localNetworks=%v, localRouters=%v", localNetworks, localRouters)
 	return localNetworks, localRouters
 }
 

@@ -4,8 +4,8 @@ import (
 	"reflect"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/fsouza/go-dockerclient"
+	log "github.com/leodotcloud/log"
 )
 
 const workerTimeout = 60 * time.Second
@@ -41,7 +41,7 @@ func NewEventRouter(bufferSize int, workerPoolSize int, dockerClient *docker.Cli
 }
 
 func (e *EventRouter) Start() error {
-	log.Info("Starting event router.")
+	log.Infof("Starting event router.")
 	go e.routeEvents()
 	return e.dockerClient.AddEventListener(e.listener)
 }

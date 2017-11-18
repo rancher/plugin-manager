@@ -3,7 +3,7 @@ package conntrack
 import (
 	"testing"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/leodotcloud/log"
 )
 
 // Some of the tests can run only when in development,
@@ -14,20 +14,20 @@ func TestCmdListDNAT(t *testing.T) {
 	if !inDevelopment {
 		t.Skip("not in development mode")
 	}
-	logrus.SetLevel(logrus.DebugLevel)
-	logrus.Debugf("TestCmdListDNAT")
+	log.SetLevelString("string")
+	log.Debugf("TestCmdListDNAT")
 
 	cmdCTListDNAT()
 }
 
 func TestParseOneConntrackEntry(t *testing.T) {
-	logrus.SetLevel(logrus.DebugLevel)
-	logrus.Debugf("parsing testEntry1")
+	log.SetLevelString("string")
+	log.Debugf("parsing testEntry1")
 	testEntry1 := "tcp      6 65 TIME_WAIT src=172.22.101.1 dst=172.22.101.101 sport=59032 dport=9901 src=10.49.205.140 dst=172.22.101.1 sport=80 dport=59032 [ASSURED] mark=0 use=1"
 
 	parseOneConntrackEntry(testEntry1)
 
-	logrus.Debugf("parsing testEntry2")
+	log.Debugf("parsing testEntry2")
 	testEntry2 := "tcp      6 151 ESTABLISHED src=172.17.0.1 dst=169.254.169.250 sport=32985 dport=80 [UNREPLIED] src=169.254.169.250 dst=172.17.0.1 sport=80 dport=32985 mark=0 use=1"
 	parseOneConntrackEntry(testEntry2)
 }
@@ -36,7 +36,7 @@ func TestCTEntryCreateDelete(t *testing.T) {
 	if !inDevelopment {
 		t.Skip("not in development mode")
 	}
-	logrus.SetLevel(logrus.DebugLevel)
+	log.SetLevelString("string")
 	var err error
 	testEntry := "tcp      6 65 TIME_WAIT src=172.22.101.1 dst=172.22.101.101 sport=59032 dport=9901 src=10.49.205.140 dst=172.22.101.1 sport=80 dport=59032 [ASSURED] mark=0 use=1"
 
@@ -44,13 +44,13 @@ func TestCTEntryCreateDelete(t *testing.T) {
 
 	err = CTEntryCreate(e)
 	if err != nil {
-		logrus.Errorf("error: %v", err)
+		log.Errorf("error: %v", err)
 		t.Fail()
 	}
 
 	err = CTEntryDelete(e)
 	if err != nil {
-		logrus.Errorf("error: %v", err)
+		log.Errorf("error: %v", err)
 		t.Fail()
 	}
 }
@@ -59,16 +59,16 @@ func TestListDNAT(t *testing.T) {
 	if !inDevelopment {
 		t.Skip("not in development mode")
 	}
-	logrus.SetLevel(logrus.DebugLevel)
+	log.SetLevelString("string")
 	_, err := ListDNAT()
 	if err != nil {
-		logrus.Errorf("error getting DNAT entries: %v", err)
+		log.Errorf("error getting DNAT entries: %v", err)
 		t.Fail()
 	}
 }
 
 func TestParseMultipleEntries(t *testing.T) {
-	logrus.SetLevel(logrus.DebugLevel)
+	log.SetLevelString("string")
 	entries := `tcp      6 431998 ESTABLISHED src=172.22.101.102 dst=172.22.101.201 sport=51784 dport=8080 src=172.22.101.201 dst=172.22.101.102 sport=8080 dport=51784 [ASSURED] mark=0 use=1
 tcp      6 431999 ESTABLISHED src=10.49.59.122 dst=169.254.169.250 sport=46733 dport=80 src=169.254.169.250 dst=10.49.59.122 sport=80 dport=46733 [ASSURED] mark=0 use=1
 udp      17 38 src=10.0.2.15 dst=10.0.2.3 sport=42683 dport=53 src=10.0.2.3 dst=10.0.2.15 sport=53 dport=42683 [ASSURED] mark=0 use=1

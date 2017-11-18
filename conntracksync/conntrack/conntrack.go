@@ -6,7 +6,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/leodotcloud/log"
 )
 
 // CTEntry represents one entry from the conntrack table
@@ -50,7 +50,7 @@ func CTEntryCreate(e CTEntry) error {
 		"--state", "ESTABLISHED",
 	)
 	if err := cmd.Run(); err != nil {
-		logrus.Errorf("error adding conntrack entry: %v", err)
+		log.Errorf("error adding conntrack entry: %v", err)
 		return err
 	}
 	return nil
@@ -70,7 +70,7 @@ func CTEntryDelete(e CTEntry) error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
-		logrus.Errorf("error deleting conntrack entry: %v", err)
+		log.Errorf("error deleting conntrack entry: %v", err)
 		return err
 	}
 	return nil
@@ -79,7 +79,7 @@ func CTEntryDelete(e CTEntry) error {
 func cmdCTListSNAT() ([]CTEntry, error) {
 	out, err := exec.Command("conntrack", "-n", "-L").Output()
 	if err != nil {
-		logrus.Errorf("error getting SNAT conntrack entries")
+		log.Errorf("error getting SNAT conntrack entries")
 		return nil, err
 	}
 
@@ -92,7 +92,7 @@ func cmdCTListSNAT() ([]CTEntry, error) {
 func cmdCTListDNAT() ([]CTEntry, error) {
 	out, err := exec.Command("conntrack", "-g", "-L").Output()
 	if err != nil {
-		logrus.Errorf("error getting DNAT conntrack entries")
+		log.Errorf("error getting DNAT conntrack entries")
 		return nil, err
 	}
 
@@ -119,7 +119,7 @@ func parseMultipleEntries(input string) []CTEntry {
 }
 
 func parseOneConntrackEntry(e string) (CTEntry, error) {
-	logrus.Debugf("conntrack: parsing conntrack entry: %v", e)
+	log.Debugf("conntrack: parsing conntrack entry: %v", e)
 	ctEntry := CTEntry{}
 
 	original := make(map[string]string)

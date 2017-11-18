@@ -8,12 +8,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Sirupsen/logrus"
 	cniTypes "github.com/containernetworking/cni/pkg/types"
 	"github.com/docker/docker/pkg/locker"
 	"github.com/docker/engine-api/client"
 	"github.com/docker/engine-api/types"
 	"github.com/docker/engine-api/types/container"
+	"github.com/leodotcloud/log"
 	"github.com/pkg/errors"
 	glue "github.com/rancher/cniglue"
 )
@@ -72,13 +72,8 @@ func (n *Manager) evaluate(id string, retryCount int) error {
 		time = inspect.State.StartedAt
 	}
 
-	logrus.WithFields(logrus.Fields{
-		"wasTime":    wasTime,
-		"wasRunning": wasRunning,
-		"running":    running,
-		"time":       time,
-		"cid":        id,
-	}).Debugf("Evaluating networking start")
+	log.Debugf("Evaluating networking start: cid=%v time=%v running=%v wasRunning=%v wasTime=%v",
+		id, time, running, wasRunning, wasTime)
 
 	if wasRunning {
 		if running && wasTime != time {
@@ -95,14 +90,14 @@ func (n *Manager) evaluate(id string, retryCount int) error {
 
 func (n *Manager) retry(id string, retryCount int) {
 	time.Sleep(2 * time.Second)
-	logrus.WithFields(logrus.Fields{"cid": id, "count": retryCount}).Infof("Evaluating state from retry")
+	log.Infof("Evaluating state from retry: cid=%v count=%v", id, retryCount)
 	if err := n.evaluate(id, retryCount); err != nil {
-		logrus.Errorf("Failed to evaluate networking: %v", err)
+		log.Errorf("Failed to evaluate networking: %v", err)
 	}
 }
 
 func (n *Manager) networkUp(id string, inspect types.ContainerJSON, retryCount int) (err error) {
-	logrus.WithFields(logrus.Fields{"networkMode": inspect.HostConfig.NetworkMode, "cid": inspect.ID}).Infof("CNI up")
+	log.Infof("CNI up: cid=%v networkMode=%v", inspect.ID, inspect.HostConfig.NetworkMode)
 	startedAt := inspect.State.StartedAt
 
 	pluginState, err := glue.LookupPluginState(inspect)
@@ -117,11 +112,8 @@ func (n *Manager) networkUp(id string, inspect types.ContainerJSON, retryCount i
 		}
 		return n.s.recordNetworkUpError(id, startedAt, errors.Wrap(err, "Couldn't bring up network"))
 	}
-	logrus.WithFields(logrus.Fields{
-		"networkMode": inspect.HostConfig.NetworkMode,
-		"cid":         inspect.ID,
-		"result":      result,
-	}).Infof("CNI up done")
+	log.Infof("CNI up done: result=%v cid=%v networkMode=%v", result, inspect.ID, inspect.HostConfig.NetworkMode)
+
 	if err := n.setupHosts(inspect, result); err != nil {
 		return n.s.recordNetworkUpError(id, startedAt, errors.Wrap(err, "Couldn't setup hosts"))
 	}
@@ -158,7 +150,7 @@ func (n *Manager) networkDown(id string, inspect types.ContainerJSON) error {
 	if inspect.ContainerJSONBase == nil || inspect.HostConfig == nil {
 		return nil
 	}
-	logrus.WithFields(logrus.Fields{"networkMode": inspect.HostConfig.NetworkMode, "cid": inspect.ID}).Infof("CNI down")
+	log.Infof("CNI down: cid=%v networkMode=%v", inspect.ID, inspect.HostConfig.NetworkMode)
 	pluginState, err := glue.LookupPluginState(inspect)
 	if err != nil && !os.IsNotExist(err) {
 		return errors.Wrap(err, "Finding plugin state on down")
@@ -167,7 +159,7 @@ func (n *Manager) networkDown(id string, inspect types.ContainerJSON) error {
 }
 
 func configureNetwork(inspect *types.ContainerJSON) bool {
-	logrus.Debugf("inpect.HostConfig: %+v inpect.Config: %+v inpect.NetworkSettings: %+v",
+	log.Debugf("inpect.HostConfig: %+v inpect.Config: %+v inpect.NetworkSettings: %+v",
 		*inspect.HostConfig, *inspect.Config, *inspect.NetworkSettings)
 	net, ok := inspect.Config.Labels[CNILabel]
 	if !ok &&

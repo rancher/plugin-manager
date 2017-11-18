@@ -10,9 +10,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/docker/engine-api/client"
 	docker "github.com/fsouza/go-dockerclient"
+	"github.com/leodotcloud/log"
 	"github.com/rancher/cniglue"
 	"github.com/rancher/go-rancher-metadata/metadata"
 )
@@ -43,7 +43,7 @@ type Watcher struct {
 
 func (w *Watcher) onChangeNoError(version string) {
 	if err := w.onChange(version); err != nil {
-		logrus.Errorf("Failed to apply cni conf: %v", err)
+		log.Errorf("Failed to apply cni conf: %v", err)
 	}
 }
 
@@ -100,14 +100,9 @@ func (w *Watcher) onChange(version string) error {
 
 	for _, service := range driverServices {
 		for _, container := range service.Containers {
-			logrus.WithFields(logrus.Fields{
-				"serviceKind":         service.Kind,
-				"serviceName":         service.Name,
-				"containerName":       container.Name,
-				"containerExternalId": container.ExternalId,
-				"containerHostUUID":   container.HostUUID,
-				"driverLabel":         hasDriverLabel(container),
-			}).Debugf("Checking for driver binary")
+			log.Debugf("Checking for driver binary: driverLabel=%v containerHostUUID=%v containerExternalId=%v containerName=%v serviceName=%v serviceKind=%v",
+				hasDriverLabel(container), container.HostUUID, container.ExternalId, container.Name, service.Name, service.Kind)
+
 			if container.ExternalId != "" && container.HostUUID == host.UUID && hasDriverLabel(container) {
 				binName := getBinaryName(container)
 				if binName != "" {
@@ -126,7 +121,7 @@ func (w *Watcher) onChange(version string) error {
 
 func (w *Watcher) apply(host metadata.Host, binaries map[string]string) error {
 	if !reflect.DeepEqual(binaries, w.applied) {
-		logrus.Infof("Setting up binaries for: %v", binaries)
+		log.Infof("Setting up binaries for: %v", binaries)
 	}
 
 	script := `#!/bin/sh
@@ -151,7 +146,7 @@ exec /usr/bin/nsenter -m -u -i -n -p -t %d -- $0 "$@"
 		ptmp := filepath.Join(binDir, name+".tmp")
 		p := filepath.Join(binDir, name)
 		content := []byte(fmt.Sprintf(script, container.State.Pid))
-		logrus.Debugf("Writing %s:\n%s", p, content)
+		log.Debugf("Writing %s:\n%s", p, content)
 		if err := ioutil.WriteFile(ptmp, content, 0700); err != nil {
 			lastErr = err
 			break
@@ -159,7 +154,7 @@ exec /usr/bin/nsenter -m -u -i -n -p -t %d -- $0 "$@"
 
 		fileInfo, err := os.Stat(p)
 		if err == nil && fileInfo.IsDir() {
-			logrus.Infof("%s is a dir, remove it", p)
+			log.Infof("%s is a dir, remove it", p)
 			if err = os.Remove(p); err != nil {
 				lastErr = err
 				break

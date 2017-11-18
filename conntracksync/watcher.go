@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/leodotcloud/log"
 	"github.com/rancher/go-rancher-metadata/metadata"
 	"github.com/rancher/plugin-manager/conntracksync/conntrack"
 	"github.com/rancher/plugin-manager/utils"
@@ -29,7 +29,7 @@ type ConntrackTableWatcher struct {
 // Watch starts the go routine to periodically check the conntrack table
 // for any discrepancies
 func Watch(syncIntervalStr string, mc metadata.Client) error {
-	logrus.Debugf("conntracksync: syncIntervalStr: %v", syncIntervalStr)
+	log.Debugf("conntracksync: syncIntervalStr: %v", syncIntervalStr)
 
 	syncInterval := DefaultSyncInterval
 	if i, err := strconv.Atoi(syncIntervalStr); err == nil {
@@ -48,15 +48,15 @@ func Watch(syncIntervalStr string, mc metadata.Client) error {
 }
 
 func (ctw *ConntrackTableWatcher) onChangeNoError(version string) {
-	logrus.Debugf("conntracksync: metadata version: %v, lastApplied: %v", version, ctw.lastApplied)
+	log.Debugf("conntracksync: metadata version: %v, lastApplied: %v", version, ctw.lastApplied)
 	timeSinceLastApplied := time.Now().Sub(ctw.lastApplied)
 	if timeSinceLastApplied < ctw.syncInterval {
 		timeToSleep := ctw.syncInterval - timeSinceLastApplied
-		logrus.Debugf("conntracksync: sleeping for %v", timeToSleep)
+		log.Debugf("conntracksync: sleeping for %v", timeToSleep)
 		time.Sleep(timeToSleep)
 	}
 	if err := ctw.doSync(); err != nil {
-		logrus.Errorf("conntracksync: while syncing, got error: %v", err)
+		log.Errorf("conntracksync: while syncing, got error: %v", err)
 	}
 	ctw.lastApplied = time.Now()
 }
@@ -64,13 +64,13 @@ func (ctw *ConntrackTableWatcher) onChangeNoError(version string) {
 func (ctw *ConntrackTableWatcher) doSync() error {
 	containersMap, err := ctw.buildContainersMaps()
 	if err != nil {
-		logrus.Errorf("conntracksync: error building containersMap")
+		log.Errorf("conntracksync: error building containersMap")
 		return err
 	}
 
 	dCTEntries, err := conntrack.ListDNAT()
 	if err != nil {
-		logrus.Errorf("conntracksync: error fetching DNAT conntrack entries")
+		log.Errorf("conntracksync: error fetching DNAT conntrack entries")
 		return err
 	}
 
@@ -87,16 +87,16 @@ func (ctw *ConntrackTableWatcher) doSync() error {
 			}
 		}
 		if c.PrimaryIp != "" && ctEntry.ReplySourceIP != c.PrimaryIp {
-			logrus.Infof("conntracksync: deleting mismatching DNAT conntrack entry found: %v. [expected: %v, got: %v]", ctEntry, c.PrimaryIp, ctEntry.ReplySourceIP)
+			log.Infof("conntracksync: deleting mismatching DNAT conntrack entry found: %v. [expected: %v, got: %v]", ctEntry, c.PrimaryIp, ctEntry.ReplySourceIP)
 			if err := conntrack.CTEntryDelete(ctEntry); err != nil {
-				logrus.Errorf("conntracksync: error deleting the conntrack entry: %v", err)
+				log.Errorf("conntracksync: error deleting the conntrack entry: %v", err)
 			}
 		}
 	}
 
 	sCTEntries, err := conntrack.ListSNAT()
 	if err != nil {
-		logrus.Errorf("conntracksync: error fetching SNAT conntrack entries")
+		log.Errorf("conntracksync: error fetching SNAT conntrack entries")
 		return err
 	}
 
@@ -113,9 +113,9 @@ func (ctw *ConntrackTableWatcher) doSync() error {
 			}
 		}
 		if c.PrimaryIp != "" && ctEntry.OriginalSourceIP != c.PrimaryIp {
-			logrus.Infof("conntracksync: deleting mismatching SNAT conntrack entry found: %v. [expected: %v, got: %v]", ctEntry, c.PrimaryIp, ctEntry.OriginalSourceIP)
+			log.Infof("conntracksync: deleting mismatching SNAT conntrack entry found: %v. [expected: %v, got: %v]", ctEntry, c.PrimaryIp, ctEntry.OriginalSourceIP)
 			if err := conntrack.CTEntryDelete(ctEntry); err != nil {
-				logrus.Errorf("conntracksync: error deleting the conntrack entry: %v", err)
+				log.Errorf("conntracksync: error deleting the conntrack entry: %v", err)
 			}
 		}
 	}
@@ -127,13 +127,13 @@ func (ctw *ConntrackTableWatcher) buildContainersMaps() (
 	map[string]*metadata.Container, error) {
 	host, err := ctw.mc.GetSelfHost()
 	if err != nil {
-		logrus.Errorf("conntracksync: error fetching self host from metadata")
+		log.Errorf("conntracksync: error fetching self host from metadata")
 		return nil, err
 	}
 
 	containers, err := ctw.mc.GetContainers()
 	if err != nil {
-		logrus.Errorf("conntracksync: error fetching containers from metadata")
+		log.Errorf("conntracksync: error fetching containers from metadata")
 		return nil, err
 	}
 	containersMap := make(map[string]*metadata.Container)

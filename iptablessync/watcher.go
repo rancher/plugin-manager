@@ -10,7 +10,7 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/leodotcloud/log"
 	"github.com/rancher/go-rancher-metadata/metadata"
 	"github.com/rancher/plugin-manager/utils"
 )
@@ -42,7 +42,7 @@ func Watch(syncInterval int, mc metadata.Client) error {
 	}
 
 	if err := iptw.runFirstTime(); err != nil {
-		logrus.Errorf("iptablessync: error running first time: %v", err)
+		log.Errorf("iptablessync: error running first time: %v", err)
 	}
 
 	go iptw.doSync()
@@ -52,11 +52,11 @@ func Watch(syncInterval int, mc metadata.Client) error {
 
 func (iptw *IPTablesWatcher) doSync() error {
 	for {
-		logrus.Debugf("iptablessync: sleeping for %v", iptw.syncInterval)
+		log.Debugf("iptablessync: sleeping for %v", iptw.syncInterval)
 		time.Sleep(iptw.syncInterval)
 
 		if err := iptw.checkAndHookChains(); err != nil {
-			logrus.Errorf("iptablessync: error doing sync: %v", err)
+			log.Errorf("iptablessync: error doing sync: %v", err)
 		}
 	}
 }
@@ -64,7 +64,7 @@ func (iptw *IPTablesWatcher) doSync() error {
 func (iptw *IPTablesWatcher) runFirstTime() error {
 	// Create the chains
 	if err := iptw.createChains(); err != nil {
-		logrus.Errorf("iptablessync: error creating chains: %v", err)
+		log.Errorf("iptablessync: error creating chains: %v", err)
 		return err
 	}
 
@@ -90,7 +90,7 @@ func (iptw *IPTablesWatcher) createChains() error {
 	buf.WriteString(":CATTLE_FORWARD -\n")
 	buf.WriteString("\nCOMMIT\n")
 
-	if logrus.GetLevel() == logrus.DebugLevel {
+	if log.GetLevelString() == "debug" {
 		fmt.Printf("creating chains\n%s", buf)
 	}
 
@@ -99,7 +99,7 @@ func (iptw *IPTablesWatcher) createChains() error {
 	cmd.Stdout = os.Stdout
 	cmd.Stdin = buf
 	if err := cmd.Run(); err != nil {
-		logrus.Errorf("iptablessync: failed to create chains\n%v", buf)
+		log.Errorf("iptablessync: failed to create chains\n%v", buf)
 		return err
 	}
 
@@ -113,23 +113,23 @@ func checkOneHookRule(rule hookRule) error {
 	install := false
 	cmd = fmt.Sprintf("iptables -w -t %v -C %v %v", rule.table, rule.chain, rule.spec)
 	if utils.RunNoStdoutNoStderr(cmd) != nil {
-		logrus.Infof("iptablessync: need to hook %v chain", rule.dstChain)
+		log.Infof("iptablessync: need to hook %v chain", rule.dstChain)
 		install = true
 	} else {
 		cmd = fmt.Sprintf("iptables -w -t %v -S %v %v", rule.table, rule.chain, rule.num)
 		outputBytes, err := utils.RunOutput(cmd)
 		output := string(outputBytes)
 		if err != nil {
-			logrus.Errorf("error running cmd: %v: %v", cmd, err)
+			log.Errorf("error running cmd: %v: %v", cmd, err)
 			hasErrored = true
 		} else {
 			expected := fmt.Sprintf("-A %v %v\n", rule.chain, rule.spec)
 			if output != expected {
-				logrus.Debugf("iptablessync: expected: %v but output: %v", expected, output)
-				logrus.Infof("iptablessync: fixing order for %v chain", rule.dstChain)
+				log.Debugf("iptablessync: expected: %v but output: %v", expected, output)
+				log.Infof("iptablessync: fixing order for %v chain", rule.dstChain)
 				cmd = fmt.Sprintf("iptables -w -t %v -D %v %v", rule.table, rule.chain, rule.spec)
 				if err := utils.RunNoStdoutNoStderr(cmd); err != nil {
-					logrus.Errorf("iptablessync: error running cmd: %v: %v", cmd, err)
+					log.Errorf("iptablessync: error running cmd: %v: %v", cmd, err)
 					hasErrored = true
 				}
 				install = true
@@ -138,9 +138,9 @@ func checkOneHookRule(rule hookRule) error {
 	}
 	if install {
 		cmd = fmt.Sprintf("iptables -w -t %v -I %v %v %v", rule.table, rule.chain, rule.num, rule.spec)
-		logrus.Infof("iptablessync: installing cmd: %v", cmd)
+		log.Infof("iptablessync: installing cmd: %v", cmd)
 		if err := utils.RunNoStdoutNoStderr(cmd); err != nil {
-			logrus.Errorf("error running cmd: %v: %v", cmd, err)
+			log.Errorf("error running cmd: %v: %v", cmd, err)
 			hasErrored = true
 		}
 	}
@@ -163,7 +163,7 @@ func (iptw *IPTablesWatcher) checkAndHookChains() error {
 		num:      "1",
 	}); err != nil {
 		hasErrored = true
-		logrus.Errorf("iptablessync: err=%v", err)
+		log.Errorf("iptablessync: err=%v", err)
 	}
 
 	if err = checkOneHookRule(hookRule{
@@ -174,7 +174,7 @@ func (iptw *IPTablesWatcher) checkAndHookChains() error {
 		num:      "1",
 	}); err != nil {
 		hasErrored = true
-		logrus.Errorf("iptablessync: err=%v", err)
+		log.Errorf("iptablessync: err=%v", err)
 	}
 
 	if err = checkOneHookRule(hookRule{
@@ -185,7 +185,7 @@ func (iptw *IPTablesWatcher) checkAndHookChains() error {
 		num:      "1",
 	}); err != nil {
 		hasErrored = true
-		logrus.Errorf("iptablessync: err=%v", err)
+		log.Errorf("iptablessync: err=%v", err)
 	}
 
 	if err = checkOneHookRule(hookRule{
@@ -196,7 +196,7 @@ func (iptw *IPTablesWatcher) checkAndHookChains() error {
 		num:      "1",
 	}); err != nil {
 		hasErrored = true
-		logrus.Errorf("iptablessync: err=%v", err)
+		log.Errorf("iptablessync: err=%v", err)
 	}
 
 	if err = checkOneHookRule(hookRule{
@@ -207,15 +207,15 @@ func (iptw *IPTablesWatcher) checkAndHookChains() error {
 		num:      "2",
 	}); err != nil {
 		hasErrored = true
-		logrus.Errorf("iptablessync: err=%v", err)
+		log.Errorf("iptablessync: err=%v", err)
 	}
 
 	bridgeSubnet, err := iptw.getBridgeSubnet()
 	if err != nil {
 		hasErrored = true
-		logrus.Errorf("iptablessync: error fetching bridgeSubnet: %v", err)
+		log.Errorf("iptablessync: error fetching bridgeSubnet: %v", err)
 	} else {
-		logrus.Debugf("iptablessync: bridgeSubnet=%v", bridgeSubnet)
+		log.Debugf("iptablessync: bridgeSubnet=%v", bridgeSubnet)
 		if err = checkOneHookRule(hookRule{
 			table:    "filter",
 			chain:    "FORWARD",
@@ -224,7 +224,7 @@ func (iptw *IPTablesWatcher) checkAndHookChains() error {
 			num:      "1",
 		}); err != nil {
 			hasErrored = true
-			logrus.Errorf("iptablessync: err=%v", err)
+			log.Errorf("iptablessync: err=%v", err)
 		}
 	}
 
@@ -236,7 +236,7 @@ func (iptw *IPTablesWatcher) checkAndHookChains() error {
 		num:      "2",
 	}); err != nil {
 		hasErrored = true
-		logrus.Errorf("iptablessync: err=%v", err)
+		log.Errorf("iptablessync: err=%v", err)
 	}
 
 	if hasErrored {
@@ -246,7 +246,7 @@ func (iptw *IPTablesWatcher) checkAndHookChains() error {
 }
 
 func (iptw *IPTablesWatcher) getBridgeSubnet() (string, error) {
-	logrus.Debugf("iptablessync: finding the bridge subnet")
+	log.Debugf("iptablessync: finding the bridge subnet")
 
 	localNetworks, _, err := utils.GetLocalNetworksAndRoutersFromMetadata(iptw.mc)
 	if err != nil {

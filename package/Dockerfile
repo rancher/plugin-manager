@@ -6,6 +6,7 @@ RUN apt-get update && \
     ipset && \
     rm -rf /var/lib/apt/lists/*
 
+ADD loglevel.tar.gz /usr/bin
 COPY plugin-manager start.sh oldvethsync /usr/bin/
 ENTRYPOINT ["/rancher-entrypoint.sh", "/usr/bin/start.sh"]
 CMD ["plugin-manager"]

@@ -8,9 +8,9 @@ import (
 	"path"
 	"sync"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/docker/engine-api/client"
 	"github.com/docker/engine-api/types"
+	"github.com/leodotcloud/log"
 )
 
 type state struct {
@@ -40,27 +40,18 @@ func newState(rootStateDir string, c *client.Client) (*state, error) {
 		} else if err != nil {
 			return nil, err
 		}
-		logrus.WithFields(logrus.Fields{
-			"cid":       container.ID,
-			"running":   inspect.State.Running,
-			"startedAt": inspect.State.StartedAt,
-		}).Infof("Inspecting on start")
+		log.Infof("Inspecting on start: startedAt=%v running=%v cid=%v", inspect.State.StartedAt, inspect.State.Running, container.ID)
 		if inspect.State.Running {
 			hasIface, err := s.hasNetwork(inspect.State.Pid)
 			if err != nil {
-				logrus.WithField("cid", inspect.ID).Errorf("Failed to inspect interfaces")
+				log.Errorf("Failed to inspect interfaces: cid=%v", inspect.ID)
 				continue
 			}
 			if hasIface {
-				logrus.WithFields(logrus.Fields{
-					"cid":       container.ID,
-					"startedAt": inspect.State.StartedAt,
-				}).Info("Recording previously started")
+				log.Infof("Recording previously started: startedAt=%v cid=%v", inspect.State.StartedAt, container.ID)
 				s.Started(container.ID, inspect.State.StartedAt, nil)
 			} else {
-				logrus.WithFields(logrus.Fields{
-					"cid": container.ID,
-				}).Info("Still needs networking")
+				log.Infof("Still needs networking: cid=%v", container.ID)
 			}
 		}
 	}
@@ -89,30 +80,30 @@ func (s *state) writeState(id, startedAt string, state interface{}) {
 
 	data, err := json.Marshal(state)
 	if err != nil {
-		logrus.Warnf("Problem marshaling network data for %v: %v", filename, err)
+		log.Errorf("Problem marshaling network data for %v: %v", filename, err)
 		return
 	}
 
 	if err := os.MkdirAll(dir, 0644); err != nil {
-		logrus.Warnf("Problem creating network state dir for %v: %v", filename, err)
+		log.Errorf("Problem creating network state dir for %v: %v", filename, err)
 		return
 	}
 
 	f, err := ioutil.TempFile(dir, startedAt)
 	if err != nil {
-		logrus.Warnf("Problem creating network data temp file for %v: %v", filename, err)
+		log.Errorf("Problem creating network data temp file for %v: %v", filename, err)
 		return
 	}
 
 	_, err = f.Write(data)
 	if err != nil {
-		logrus.Warnf("Problem writing network data to temp file for %v: %v", filename, err)
+		log.Errorf("Problem writing network data to temp file for %v: %v", filename, err)
 		return
 	}
 	defer f.Close()
 
 	if err := os.Rename(f.Name(), filename); err != nil {
-		logrus.Warnf("Problem renaming network data file for %v: %v", filename, err)
+		log.Errorf("Problem renaming network data file for %v: %v", filename, err)
 	}
 }
 
@@ -123,7 +114,7 @@ func (s *state) Stopped(id string) {
 
 	dirName := path.Join(s.rootStateDir, id)
 	if err := os.RemoveAll(dirName); err != nil {
-		logrus.Warnf("Problem cleaning up network state dir %v: %v", dirName, err)
+		log.Errorf("Problem cleaning up network state dir %v: %v", dirName, err)
 	}
 }
 

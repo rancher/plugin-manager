@@ -5,9 +5,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/containernetworking/cni/pkg/ns"
 	"github.com/docker/engine-api/client"
+	"github.com/leodotcloud/log"
 	"github.com/pkg/errors"
 	"github.com/rancher/go-rancher-metadata/metadata"
 	"github.com/rancher/plugin-manager/network"
@@ -36,7 +36,7 @@ type ARPTableWatcher struct {
 // Watch starts the go routine to periodically check the ARP table
 // for any discrepancies
 func Watch(syncIntervalStr string, mc metadata.Client, dc *client.Client) error {
-	logrus.Debugf("arpsync: syncIntervalStr: %v", syncIntervalStr)
+	log.Debugf("arpsync: syncIntervalStr: %v", syncIntervalStr)
 
 	syncInterval := DefaultSyncInterval
 	if i, err := strconv.Atoi(syncIntervalStr); err == nil {
@@ -57,15 +57,15 @@ func Watch(syncIntervalStr string, mc metadata.Client, dc *client.Client) error 
 }
 
 func (atw *ARPTableWatcher) onChangeNoError(version string) {
-	logrus.Debugf("arpsync: metadata version: %v, lastApplied: %v", version, atw.lastApplied)
+	log.Debugf("arpsync: metadata version: %v, lastApplied: %v", version, atw.lastApplied)
 	timeSinceLastApplied := time.Now().Sub(atw.lastApplied)
 	if timeSinceLastApplied < atw.syncInterval {
 		timeToSleep := atw.syncInterval - timeSinceLastApplied
-		logrus.Debugf("arpsync: sleeping for %v", timeToSleep)
+		log.Debugf("arpsync: sleeping for %v", timeToSleep)
 		time.Sleep(timeToSleep)
 	}
 	if err := atw.doSync(); err != nil {
-		logrus.Errorf("arpsync: while syncing, got error: %v", err)
+		log.Errorf("arpsync: while syncing, got error: %v", err)
 	}
 	atw.lastApplied = time.Now()
 }
@@ -104,7 +104,7 @@ func (atw *ARPTableWatcher) doSync() error {
 		return errors.Wrap(err, "get local networks")
 	}
 
-	logrus.Debugf("arpsync: atw.knownRouters=%v", atw.knownRouters)
+	log.Debugf("arpsync: atw.knownRouters=%v", atw.knownRouters)
 
 	for _, localNetwork := range localNetworks {
 		if routers[localNetwork.UUID].Labels[syncLabel] != "true" {
@@ -128,17 +128,17 @@ func (atw *ARPTableWatcher) doSync() error {
 
 		if atw.knownRouters[localNetwork.UUID].PrimaryMacAddress != networkDriverMacAddress || atw.routerApplyTries < 10 {
 			if atw.knownRouters[localNetwork.UUID].PrimaryMacAddress != networkDriverMacAddress {
-				logrus.Debugf("arpsync: network router mac address changed from=%v to=%v", atw.knownRouters[localNetwork.UUID].PrimaryMacAddress, networkDriverMacAddress)
+				log.Debugf("arpsync: network router mac address changed from=%v to=%v", atw.knownRouters[localNetwork.UUID].PrimaryMacAddress, networkDriverMacAddress)
 				atw.routerApplyTries = 0
 			}
 
 			atw.routerApplyTries++
-			logrus.Infof("arpsync: Network router changed, syncing ARP tables %d/10 in containers, new MAC: %v", atw.routerApplyTries, networkDriverMacAddress)
+			log.Infof("arpsync: Network router changed, syncing ARP tables %d/10 in containers, new MAC: %v", atw.routerApplyTries, networkDriverMacAddress)
 			err := network.ForEachContainerNS(atw.dc, atw.mc, localNetwork.UUID, func(container metadata.Container, _ ns.NetNS) error {
 				return syncArpTable(container.ExternalId, networkDriverMacAddress, containersMap, host)
 			})
 			if err != nil {
-				logrus.Errorf("arpsync: got error while syncing arp tables for containers=%v", err)
+				log.Errorf("arpsync: got error while syncing arp tables for containers=%v", err)
 				lastError = err
 			}
 		}
@@ -156,7 +156,7 @@ func syncArpTable(context string, networkDriverMacAddress string, containersMap 
 	if context != "host" {
 		link, err := netlink.LinkByName("eth0")
 		if err != nil {
-			logrus.Errorf("arpsync): error fetching eth0 link for %v: %v", context, err)
+			log.Errorf("arpsync): error fetching eth0 link for %v: %v", context, err)
 			return err
 		}
 		linkIndex = link.Attrs().Index
@@ -164,10 +164,10 @@ func syncArpTable(context string, networkDriverMacAddress string, containersMap 
 	// Read the ARP table
 	entries, err := netlink.NeighList(linkIndex, netlink.FAMILY_V4)
 	if err != nil {
-		logrus.Errorf("arpsync(%v): error fetching entries from ARP table", context)
+		log.Errorf("arpsync(%v): error fetching entries from ARP table", context)
 		return err
 	}
-	logrus.Debugf("arpsync(%v): entries=%+v", context, entries)
+	log.Debugf("arpsync(%v): entries=%+v", context, entries)
 
 	for _, aEntry := range entries {
 		if container, found := containersMap[aEntry.IP.String()]; found {
@@ -177,11 +177,11 @@ func syncArpTable(context string, networkDriverMacAddress string, containersMap 
 			}
 
 			if aEntry.HardwareAddr.String() != expected {
-				logrus.Infof("arpsync: (%s) wrong ARP entry found=%+v(expected: %v) for local container, fixing it", context, aEntry, expected)
+				log.Infof("arpsync: (%s) wrong ARP entry found=%+v(expected: %v) for local container, fixing it", context, aEntry, expected)
 				fixARPEntry(aEntry, expected)
 			}
 		} else {
-			logrus.Debugf("arpsync(%v): container not found for ARP entry: %+v", context, aEntry)
+			log.Debugf("arpsync(%v): container not found for ARP entry: %+v", context, aEntry)
 		}
 	}
 
@@ -192,14 +192,14 @@ func fixARPEntry(oldEntry netlink.Neigh, newMACAddress string) error {
 	var err error
 	var newHardwareAddr net.HardwareAddr
 	if newHardwareAddr, err = net.ParseMAC(newMACAddress); err != nil {
-		logrus.Errorf("arpsync: couldn't parse MAC address(%v): %v", newMACAddress, err)
+		log.Errorf("arpsync: couldn't parse MAC address(%v): %v", newMACAddress, err)
 		return err
 	}
 	newEntry := oldEntry
 	newEntry.HardwareAddr = newHardwareAddr
 	newEntry.State = netlink.NUD_REACHABLE
 	if err = netlink.NeighSet(&newEntry); err != nil {
-		logrus.Errorf("arpsync: error changing ARP entry: %v", err)
+		log.Errorf("arpsync: error changing ARP entry: %v", err)
 		return err
 	}
 	return nil

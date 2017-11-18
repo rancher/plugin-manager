@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/docker/engine-api/client"
+	"github.com/leodotcloud/log"
+	"github.com/leodotcloud/log/server"
 	"github.com/pkg/errors"
 	"github.com/rancher/go-rancher-metadata/metadata"
 	"github.com/rancher/plugin-manager/arpsync"
@@ -108,13 +109,15 @@ func main() {
 }
 
 func run(c *cli.Context) error {
+	server.StartServerWithDefaults()
+
 	if c.Bool("debug") {
-		logrus.SetLevel(logrus.DebugLevel)
+		log.SetLevelString("debug")
 	}
 
 	if !c.Bool("disable-routesync") {
 		if err := routesync.Watch(c.String("routesync-interval")); err != nil {
-			logrus.Errorf("Failed to start routesync: %v", err)
+			log.Errorf("Failed to start routesync: %v", err)
 			return err
 		}
 	}
@@ -127,7 +130,7 @@ func run(c *cli.Context) error {
 	reaper.CheckMetadata(dClient)
 
 	metadataURL := fmt.Sprintf(metadataURLTemplate, c.String("metadata-address"))
-	logrus.Infof("Waiting for metadata")
+	log.Infof("Waiting for metadata")
 	mClient, err := metadata.NewClientAndWait(metadataURL)
 	if err != nil {
 		return errors.Wrap(err, "Creating metadata client")
@@ -143,42 +146,42 @@ func run(c *cli.Context) error {
 	}
 
 	if err := reaper.Watch(dClient, mClient); err != nil {
-		logrus.Errorf("Failed to start unmanaged container reaper: %v", err)
+		log.Errorf("Failed to start unmanaged container reaper: %v", err)
 	}
 
 	if err := iptablessync.Watch(c.Int("iptables-sync-interval"), mClient); err != nil {
-		logrus.Errorf("Failed to start iptablessync: %v", err)
+		log.Errorf("Failed to start iptablessync: %v", err)
 	}
 
 	if err := hostports.Watch(mClient, c.String("metadata-address"), c.String("metadata-listen-port")); err != nil {
-		logrus.Errorf("Failed to start host ports configuration: %v", err)
+		log.Errorf("Failed to start host ports configuration: %v", err)
 	}
 
 	if err := hostnat.Watch(mClient); err != nil {
-		logrus.Errorf("Failed to start host nat configuration: %v", err)
+		log.Errorf("Failed to start host nat configuration: %v", err)
 	}
 
 	if !c.Bool("disable-conntracksync") {
 		if err := conntracksync.Watch(c.String("conntracksync-interval"), mClient); err != nil {
-			logrus.Errorf("Failed to start conntracksync: %v", err)
+			log.Errorf("Failed to start conntracksync: %v", err)
 		}
 	}
 
 	if !c.Bool("disable-cni-setup") {
 		if err := cniconf.Watch(mClient); err != nil {
-			logrus.Errorf("Failed to start cni config: %v", err)
+			log.Errorf("Failed to start cni config: %v", err)
 		}
 	}
 
 	if !c.Bool("disable-arpsync") {
 		if err := arpsync.Watch(c.String("arpsync-interval"), mClient, dClient); err != nil {
-			logrus.Errorf("Failed to start arpsync: %v", err)
+			log.Errorf("Failed to start arpsync: %v", err)
 		}
 	}
 
 	if !c.Bool("disable-vethsync") {
 		if err := vethsync.Watch(c.String("vethsync-interval"), metadataURL, mClient, dClient, c.Bool("debug")); err != nil {
-			logrus.Errorf("Failed to start vethsync: %v", err)
+			log.Errorf("Failed to start vethsync: %v", err)
 		}
 	}
 

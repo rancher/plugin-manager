@@ -10,7 +10,7 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/leodotcloud/log"
 	"github.com/rancher/cniglue"
 	"github.com/rancher/go-rancher-metadata/metadata"
 	"github.com/rancher/plugin-manager/events"
@@ -44,7 +44,7 @@ type watcher struct {
 
 func (w *watcher) onChangeNoError(version string) {
 	if err := w.onChange(version); err != nil {
-		logrus.Errorf("Failed to apply cni conf: %v", err)
+		log.Errorf("Failed to apply cni conf: %v", err)
 	}
 }
 
@@ -63,7 +63,7 @@ func (w *watcher) onChange(version string) error {
 
 	for _, network := range networks {
 		if network.EnvironmentUUID != host.EnvironmentUUID {
-			logrus.Debugf("network: %v is not local to this environment", network.UUID)
+			log.Debugf("network: %v is not local to this environment", network.UUID)
 			continue
 		}
 		_, ok := network.Metadata["cniConfig"].(map[string]interface{})
@@ -73,7 +73,7 @@ func (w *watcher) onChange(version string) error {
 
 		if forceApply || !reflect.DeepEqual(w.applied[network.Name], network) {
 			if err := w.apply(network, host); err != nil {
-				logrus.Errorf("Failed to apply cni conf: %v", err)
+				log.Errorf("Failed to apply cni conf: %v", err)
 			}
 		}
 	}
@@ -107,7 +107,7 @@ func (w *watcher) apply(network metadata.Network, host metadata.Host) error {
 			continue
 		}
 
-		logrus.Debugf("Writing %s: %s", p, out)
+		log.Debugf("Writing %s: %s", p, out)
 		if err := ioutil.WriteFile(p, out.Bytes(), 0600); err != nil {
 			lastErr = err
 		}
@@ -140,10 +140,10 @@ func checkMTU(config interface{}) {
 
 	dockerBridgeMTU, exist, err := getDockerNetworkBridgeMTU(bridgeName)
 	if err != nil {
-		logrus.Errorf("checkMTU: Got error from docker api: %s", err)
+		log.Errorf("checkMTU: Got error from docker api: %s", err)
 	}
 	if exist && dockerBridgeMTU != cniConfigMTU {
-		logrus.Errorf("checkMTU: Docker Bridge MTU %v is different from CNI config MTU %v", dockerBridgeMTU, cniConfigMTU)
+		log.Errorf("checkMTU: Docker Bridge MTU %v is different from CNI config MTU %v", dockerBridgeMTU, cniConfigMTU)
 	}
 }
 

@@ -3,8 +3,8 @@ package macsync
 import (
 	"testing"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/docker/engine-api/client"
+	"github.com/leodotcloud/log"
 	"github.com/rancher/go-rancher-metadata/metadata"
 )
 
@@ -16,17 +16,17 @@ func TestDoSync(t *testing.T) {
 	if !inDevelopment {
 		t.Skip("not in development mode")
 	}
-	logrus.SetLevel(logrus.DebugLevel)
-	logrus.Debugf("TestDoSync")
+	log.SetLevelString("string")
+	log.Debugf("TestDoSync")
 
 	mc, err := metadata.NewClientAndWait("http://169.254.169.250/2016-07-29")
 	if err != nil {
-		logrus.Errorf("error creating metadata client")
+		log.Errorf("error creating metadata client")
 		t.Fail()
 	}
 	dClient, err := client.NewEnvClient()
 	if err != nil {
-		logrus.Errorf("err=%v", err)
+		log.Errorf("err=%v", err)
 		t.Fail()
 	}
 	ms := MACSyncer{

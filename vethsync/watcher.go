@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/docker/engine-api/client"
+	"github.com/leodotcloud/log"
 	"github.com/rancher/go-rancher-metadata/metadata"
 	"github.com/rancher/plugin-manager/vethsync/utils"
 )
@@ -33,7 +33,7 @@ type VethWatcher struct {
 // Watch starts the go routine to periodically check the conntrack table
 // for any discrepancies
 func Watch(syncIntervalStr, metadataURL string, mc metadata.Client, dc *client.Client, debug bool) error {
-	logrus.Debugf("vethsync: syncIntervalStr: %v", syncIntervalStr)
+	log.Debugf("vethsync: syncIntervalStr: %v", syncIntervalStr)
 
 	syncInterval := DefaultSyncInterval
 	if i, err := strconv.Atoi(syncIntervalStr); err == nil {
@@ -55,15 +55,15 @@ func Watch(syncIntervalStr, metadataURL string, mc metadata.Client, dc *client.C
 }
 
 func (vw *VethWatcher) onChangeNoError(version string) {
-	logrus.Debugf("vethsync: metadata version: %v, lastApplied: %v", version, vw.lastApplied)
+	log.Debugf("vethsync: metadata version: %v, lastApplied: %v", version, vw.lastApplied)
 	timeSinceLastApplied := time.Now().Sub(vw.lastApplied)
 	if timeSinceLastApplied < vw.syncInterval {
 		timeToSleep := vw.syncInterval - timeSinceLastApplied
-		logrus.Debugf("vethsync: sleeping for %v", timeToSleep)
+		log.Debugf("vethsync: sleeping for %v", timeToSleep)
 		time.Sleep(timeToSleep)
 	}
 	if err := vw.doSync(); err != nil {
-		logrus.Errorf("vethsync: while syncing, got error: %v", err)
+		log.Errorf("vethsync: while syncing, got error: %v", err)
 	}
 	vw.lastApplied = time.Now()
 }
@@ -71,24 +71,24 @@ func (vw *VethWatcher) onChangeNoError(version string) {
 func (vw *VethWatcher) doSync() error {
 	hostVethMap, err := utils.GetHostViewVethMap("vethr", vw.mc)
 	if err != nil {
-		logrus.Errorf("vethsync: error building hostVethMap list")
+		log.Errorf("vethsync: error building hostVethMap list")
 		return err
 	}
-	logrus.Debugf("vethsync: hostVethMap: %v", hostVethMap)
+	log.Debugf("vethsync: hostVethMap: %v", hostVethMap)
 
 	containersVethMap, err := utils.GetContainersViewVethMapUsingID(vw.dc)
 	if err != nil {
-		logrus.Errorf("vethsync: error building containersVethMap")
+		log.Errorf("vethsync: error building containersVethMap")
 		return err
 	}
-	logrus.Debugf("vethsync: containersVethMap: %v", containersVethMap)
+	log.Debugf("vethsync: containersVethMap: %v", containersVethMap)
 
 	dangling, err := utils.GetDanglingVeths(false, hostVethMap, containersVethMap)
 	if err != nil {
-		logrus.Errorf("vethsync: error checking for dangling veths: %v", err)
+		log.Errorf("vethsync: error checking for dangling veths: %v", err)
 		return err
 	}
-	logrus.Debugf("vethsync: dangling: %v", dangling)
+	log.Debugf("vethsync: dangling: %v", dangling)
 
 	if len(dangling) > 0 {
 		utils.CleanUpDanglingVeths(dangling)
@@ -102,13 +102,13 @@ func (vw *VethWatcher) runOldVethSyncOnceAtStartup() error {
 	if vw.debug {
 		cmdStr = append(cmdStr, "--debug")
 	}
-	logrus.Debugf("vethsync: about to run cmd: %v", cmdStr)
+	log.Debugf("vethsync: about to run cmd: %v", cmdStr)
 	cmd := exec.Command(cmdStr[0], cmdStr[1:]...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	err := cmd.Run()
 	if err != nil {
-		logrus.Errorf("vethsync: error running cmd %v: %v", cmdStr, err)
+		log.Errorf("vethsync: error running cmd %v: %v", cmdStr, err)
 		return err
 	}
 	return nil

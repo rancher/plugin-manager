@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/leodotcloud/log"
 )
 
 func TestConditionsMetToWatch(t *testing.T) {
@@ -14,7 +14,7 @@ func TestConditionsMetToWatch(t *testing.T) {
 	expected = false
 
 	if actual != expected {
-		logrus.Errorf("expected: %v, got actual: %v", expected, actual)
+		log.Errorf("expected: %v, got actual: %v", expected, actual)
 		t.Fail()
 	}
 
@@ -23,7 +23,7 @@ func TestConditionsMetToWatch(t *testing.T) {
 	expected = false
 
 	if actual != expected {
-		logrus.Errorf("expected: %v, got actual: %v", expected, actual)
+		log.Errorf("expected: %v, got actual: %v", expected, actual)
 		t.Fail()
 	}
 
@@ -32,7 +32,7 @@ func TestConditionsMetToWatch(t *testing.T) {
 	expected = true
 
 	if actual != expected {
-		logrus.Errorf("expected: %v, got actual: %v", expected, actual)
+		log.Errorf("expected: %v, got actual: %v", expected, actual)
 		t.Fail()
 	}
 
@@ -41,7 +41,7 @@ func TestConditionsMetToWatch(t *testing.T) {
 	expected = false
 
 	if actual != expected {
-		logrus.Errorf("expected: %v, got actual: %v", expected, actual)
+		log.Errorf("expected: %v, got actual: %v", expected, actual)
 		t.Fail()
 	}
 
@@ -50,7 +50,7 @@ func TestConditionsMetToWatch(t *testing.T) {
 	expected = false
 
 	if actual != expected {
-		logrus.Errorf("expected: %v, got actual: %v", expected, actual)
+		log.Errorf("expected: %v, got actual: %v", expected, actual)
 		t.Fail()
 	}
 }
@@ -59,13 +59,13 @@ func TestConditionsMetToWatch(t *testing.T) {
 //	var err error
 //	err = addRouteToMetadataIP("docker0", "169.254.169.250")
 //	if err != nil {
-//		logrus.Errorf("error: %v", err)
+//		log.Errorf("error: %v", err)
 //		t.Fail()
 //	}
 //
 //	err = addRouteToMetadataIP("eth0", "169.254.169.250")
 //	if err == nil {
-//		logrus.Errorf("expecting error, but got nil")
+//		log.Errorf("expecting error, but got nil")
 //		t.Fail()
 //	}
 //}

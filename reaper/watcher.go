@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/docker/engine-api/client"
 	"github.com/docker/engine-api/types"
 	"github.com/jpillora/backoff"
+	"github.com/leodotcloud/log"
 	"github.com/rancher/go-rancher-metadata/metadata"
 )
 
@@ -39,7 +39,7 @@ func watchMetadata(dockerClient *client.Client) {
 	for {
 		err := CheckMetadata(dockerClient)
 		if err != nil {
-			logrus.Errorf("reaper: Failed to check for bad metadata: %v", err)
+			log.Errorf("reaper: Failed to check for bad metadata: %v", err)
 		}
 		time.Sleep(b.Duration())
 	}
@@ -52,7 +52,7 @@ type watcher struct {
 
 func (w *watcher) onChangeNoError(version string) {
 	if err := w.onChange(version); err != nil {
-		logrus.Errorf("reaper: Failed to watch for orphan containers: %v", err)
+		log.Errorf("reaper: Failed to watch for orphan containers: %v", err)
 	}
 }
 
@@ -118,10 +118,10 @@ func CheckMetadata(dockerClient *client.Client) error {
 	}
 
 	for _, id := range toStop {
-		logrus.Infof("reaper:  Stopping duplicate metadata/dns service: %s", id)
+		log.Infof("reaper:  Stopping duplicate metadata/dns service: %s", id)
 		t := time.Duration(0)
 		if err := dockerClient.ContainerStop(context.Background(), id, &t); err != nil {
-			logrus.Errorf("reaper:  Failed to stop duplicate metadata/dns service: %s", id)
+			log.Errorf("reaper:  Failed to stop duplicate metadata/dns service: %s", id)
 		}
 	}
 
@@ -129,11 +129,11 @@ func CheckMetadata(dockerClient *client.Client) error {
 }
 
 func (w *watcher) removeContainer(container metadata.Container) {
-	logrus.Infof("reaper:  Removing unmanaged container %s %s", container.Name, container.ExternalId)
+	log.Infof("reaper:  Removing unmanaged container %s %s", container.Name, container.ExternalId)
 	err := w.dc.ContainerRemove(context.Background(), container.ExternalId, types.ContainerRemoveOptions{
 		Force: true,
 	})
 	if err != nil {
-		logrus.Errorf("reaper: Removed failed: %v", err)
+		log.Errorf("reaper: Removed failed: %v", err)
 	}
 }

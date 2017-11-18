@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/leodotcloud/log"
 	"github.com/rancher/go-rancher-metadata/metadata"
 )
 
@@ -16,11 +16,11 @@ func TestDoSync(t *testing.T) {
 	if !inDevelopment {
 		t.Skip("not in development mode")
 	}
-	logrus.SetLevel(logrus.DebugLevel)
-	logrus.Debugf("TestDoSync")
+	log.SetLevelString("string")
+	log.Debugf("TestDoSync")
 	mc, err := metadata.NewClientAndWait("http://169.254.169.250/2016-07-29")
 	if err != nil {
-		logrus.Errorf("error creating metadata client")
+		log.Errorf("error creating metadata client")
 		t.Fail()
 	}
 
@@ -30,6 +30,6 @@ func TestDoSync(t *testing.T) {
 	}
 
 	if err := atw.doSync(); err != nil {
-		logrus.Errorf("arpsync: error doing a sync of the ARP table: %v", err)
+		log.Errorf("arpsync: error doing a sync of the ARP table: %v", err)
 	}
 }

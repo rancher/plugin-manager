@@ -6,10 +6,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/containernetworking/cni/pkg/ns"
 	"github.com/docker/engine-api/client"
 	"github.com/docker/engine-api/types"
+	"github.com/leodotcloud/log"
 	//"github.com/pkg/errors"
 	"github.com/rancher/go-rancher-metadata/metadata"
 	"github.com/rancher/plugin-manager/network"
@@ -24,17 +24,17 @@ func GetHostViewVethMap(vethPrefix string, mc metadata.Client) (map[string]*netl
 
 	alllinks, err := netlink.LinkList()
 	if err != nil {
-		logrus.Errorf("vethsync/utils: error getting links: %v", err)
+		log.Errorf("vethsync/utils: error getting links: %v", err)
 		return nil, err
 	}
-	logrus.Debugf("vethsync/utils: alllinks: %v", alllinks)
+	log.Debugf("vethsync/utils: alllinks: %v", alllinks)
 
 	localNetworks, _, err := utils.GetLocalNetworksAndRoutersFromMetadata(mc)
 	if err != nil {
-		logrus.Errorf("vethsync/utils: error fetching local networks: %v", err)
+		log.Errorf("vethsync/utils: error fetching local networks: %v", err)
 		return nil, err
 	}
-	logrus.Debugf("vethsync/utils: localNetworks: %v", localNetworks)
+	log.Debugf("vethsync/utils: localNetworks: %v", localNetworks)
 	if len(localNetworks) == 0 {
 		return veths, nil
 	}
@@ -52,22 +52,22 @@ func GetHostViewVethMap(vethPrefix string, mc metadata.Client) (map[string]*netl
 		}
 		localBridges[b] = true
 	}
-	logrus.Debugf("localBridges: %v", localBridges)
+	log.Debugf("localBridges: %v", localBridges)
 
 	localBridgesLinksMap := make(map[int]*netlink.Link)
 	for index, l := range alllinks {
 		if _, found := localBridges[l.Attrs().Name]; found {
 			localBridgesLinksMap[l.Attrs().Index] = &alllinks[index]
-			logrus.Debugf("vethsync/utils: found bridge link: %v", l)
+			log.Debugf("vethsync/utils: found bridge link: %v", l)
 		}
 	}
 
 	if len(localBridgesLinksMap) == 0 {
 		err = fmt.Errorf("couldn't find any local bridge link")
-		logrus.Errorf("vethsync/utils: %v", err)
+		log.Errorf("vethsync/utils: %v", err)
 		return nil, err
 	}
-	logrus.Debugf("vethsync/utils: localBridgesLinksMap: %v", localBridgesLinksMap)
+	log.Debugf("vethsync/utils: localBridgesLinksMap: %v", localBridgesLinksMap)
 
 	for index, l := range alllinks {
 		if !strings.HasPrefix(l.Attrs().Name, vethPrefix) {
@@ -76,7 +76,7 @@ func GetHostViewVethMap(vethPrefix string, mc metadata.Client) (map[string]*netl
 		if _, found := localBridgesLinksMap[l.Attrs().MasterIndex]; !found {
 			continue
 		}
-		logrus.Debugf("vethsync/utils: %v", l)
+		log.Debugf("vethsync/utils: %v", l)
 		veths[strconv.Itoa(l.Attrs().Index)] = &alllinks[index]
 	}
 
@@ -90,20 +90,20 @@ func getBridgeInfoFromCNIConfig(cniConf map[string]interface{}) (string, error) 
 		props, ok := config.(map[string]interface{})
 		if !ok {
 			err := fmt.Errorf("error getting props from cni config")
-			logrus.Errorf("vethsync/utils: %v", err)
+			log.Errorf("vethsync/utils: %v", err)
 			lastErr = err
 			continue
 		}
 		bridge, ok = props["bridge"].(string)
 		if !ok {
 			err := fmt.Errorf("error getting bridge from cni config")
-			logrus.Errorf("vethsync/utils: %v", err)
+			log.Errorf("vethsync/utils: %v", err)
 			lastErr = err
 			continue
 		}
 	}
 
-	logrus.Debugf("vethsync/utils: bridge: %v", bridge)
+	log.Debugf("vethsync/utils: bridge: %v", bridge)
 	return bridge, lastErr
 }
 
@@ -112,7 +112,7 @@ func getBridgeInfoFromCNIConfig(cniConf map[string]interface{}) (string, error) 
 func GetContainersViewVethMapByEnteringNS(dc *client.Client) (map[string]bool, error) {
 	containers, err := dc.ContainerList(context.Background(), types.ContainerListOptions{})
 	if err != nil {
-		logrus.Errorf("vethsync/utils: error fetching containers from docker client: %v", err)
+		log.Errorf("vethsync/utils: error fetching containers from docker client: %v", err)
 		return nil, err
 	}
 	containerVethIndices := map[string]bool{}
@@ -131,10 +131,10 @@ func GetContainersViewVethMapByEnteringNS(dc *client.Client) (map[string]bool, e
 			return nil
 		})
 		if err != nil {
-			logrus.Errorf("vethsync/utils: error figuring out the vethIndex for container %v: %v", aContainer.ID, err)
+			log.Errorf("vethsync/utils: error figuring out the vethIndex for container %v: %v", aContainer.ID, err)
 			continue
 		}
-		logrus.Debugf("vethsync/utils: for container %v got vethIndex: %v", aContainer.ID, vethIndex)
+		log.Debugf("vethsync/utils: for container %v got vethIndex: %v", aContainer.ID, vethIndex)
 		containerVethIndices[vethIndex] = true
 	}
 
@@ -146,7 +146,7 @@ func GetContainersViewVethMapByEnteringNS(dc *client.Client) (map[string]bool, e
 func GetContainersViewVethMapUsingID(dc *client.Client) (map[string]bool, error) {
 	containers, err := dc.ContainerList(context.Background(), types.ContainerListOptions{})
 	if err != nil {
-		logrus.Errorf("vethsync/utils: error fetching containers from docker client: %v", err)
+		log.Errorf("vethsync/utils: error fetching containers from docker client: %v", err)
 		return nil, err
 	}
 	containerVethIndices := map[string]bool{}
@@ -165,7 +165,7 @@ func GetContainersViewVethMapUsingID(dc *client.Client) (map[string]bool, error)
 // veths to figure out if there are any dangling veths present
 func GetDanglingVeths(
 	indexInUse bool, hostVethMap map[string]*netlink.Link, containerVethMap map[string]bool) (map[string]*netlink.Link, error) {
-	logrus.Debugf("vethsync/utils: checking for dangling veths")
+	log.Debugf("vethsync/utils: checking for dangling veths")
 
 	dangling := make(map[string]*netlink.Link)
 	for k, v := range hostVethMap {
@@ -176,7 +176,7 @@ func GetDanglingVeths(
 			_, found = containerVethMap[(*v).Attrs().Name]
 		}
 		if !found {
-			logrus.Debugf("vethsync/utils: dangling veth found: %v", *v)
+			log.Debugf("vethsync/utils: dangling veth found: %v", *v)
 			dangling[k] = v
 		}
 	}
@@ -186,10 +186,10 @@ func GetDanglingVeths(
 
 // CleanUpDanglingVeths deletes the given dangling veths from the host
 func CleanUpDanglingVeths(dangling map[string]*netlink.Link) error {
-	logrus.Debugf("vethsync/utils: cleaning up dangling veths")
+	log.Debugf("vethsync/utils: cleaning up dangling veths")
 	for _, v := range dangling {
 		if err := netlink.LinkDel(*v); err != nil {
-			logrus.Errorf("vethsync/utils: error deleting dangling veth: %v", *v)
+			log.Errorf("vethsync/utils: error deleting dangling veth: %v", *v)
 			continue
 		}
 	}

@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/docker/engine-api/client"
+	"github.com/leodotcloud/log"
 	"github.com/rancher/go-rancher-metadata/metadata"
 )
 
@@ -17,7 +17,7 @@ func TestGetBridgeInfoFromCNIConfig(t *testing.T) {
 	if !inDevelopment {
 		t.Skip("not in development mode")
 	}
-	logrus.SetLevel(logrus.DebugLevel)
+	log.SetLevelString("string")
 	cniConf := `{"10-rancher.conf": {
   "bridge": "docker0",
   "bridgeSubnet": "10.42.0.0/16",
@@ -46,7 +46,7 @@ func TestGetBridgeInfoFromCNIConfig(t *testing.T) {
 	var c map[string]interface{}
 
 	json.Unmarshal([]byte(cniConf), &c)
-	logrus.Debugf("c: %#v", c)
+	log.Debugf("c: %#v", c)
 
 	getBridgeInfoFromCNIConfig(c)
 }
@@ -55,25 +55,25 @@ func TestGetContainersViewVethMapByEnteringNS(t *testing.T) {
 	if !inDevelopment {
 		t.Skip("not in development mode")
 	}
-	logrus.SetLevel(logrus.DebugLevel)
+	log.SetLevelString("string")
 
 	dClient, err := client.NewEnvClient()
 	if err != nil {
-		logrus.Errorf("err=%v", err)
+		log.Errorf("err=%v", err)
 		t.Fail()
 	}
 	containerVethIndices, err := GetContainersViewVethMapByEnteringNS(dClient)
 	if err != nil {
 		t.Fatalf("not expecting error: %v", err)
 	}
-	logrus.Debugf("containerVethIndices: %#v", containerVethIndices)
+	log.Debugf("containerVethIndices: %#v", containerVethIndices)
 }
 
 func TestGetHostViewVethMap(t *testing.T) {
 	if !inDevelopment {
 		t.Skip("not in development mode")
 	}
-	logrus.SetLevel(logrus.DebugLevel)
+	log.SetLevelString("string")
 
 	metadataURL := "http://169.254.169.250/2016-07-29"
 	mc, err := metadata.NewClientAndWait(metadataURL)
@@ -85,36 +85,36 @@ func TestGetHostViewVethMap(t *testing.T) {
 	if err != nil {
 		t.Fatalf("vethsync: error building hostVethMap list")
 	}
-	logrus.Debugf("vethsync: hostVethMap: %v", hostVethMap)
+	log.Debugf("vethsync: hostVethMap: %v", hostVethMap)
 }
 
 func TestGetContainersViewVethMapUsingID(t *testing.T) {
 	if !inDevelopment {
 		t.Skip("not in development mode")
 	}
-	logrus.SetLevel(logrus.DebugLevel)
+	log.SetLevelString("string")
 
 	dClient, err := client.NewEnvClient()
 	if err != nil {
-		logrus.Errorf("err=%v", err)
+		log.Errorf("err=%v", err)
 		t.Fail()
 	}
 	containerVethIndices, err := GetContainersViewVethMapUsingID(dClient)
 	if err != nil {
 		t.Fatalf("not expecting error: %v", err)
 	}
-	logrus.Debugf("containerVethIndices: %#v", containerVethIndices)
+	log.Debugf("containerVethIndices: %#v", containerVethIndices)
 }
 
 func TestGetDanglingVeths(t *testing.T) {
 	if !inDevelopment {
 		t.Skip("not in development mode")
 	}
-	logrus.SetLevel(logrus.DebugLevel)
+	log.SetLevelString("string")
 
 	dClient, err := client.NewEnvClient()
 	if err != nil {
-		logrus.Errorf("err=%v", err)
+		log.Errorf("err=%v", err)
 		t.Fail()
 	}
 	metadataURL := "http://169.254.169.250/2016-07-29"
@@ -126,17 +126,17 @@ func TestGetDanglingVeths(t *testing.T) {
 	if err != nil {
 		t.Fatalf("vethsync: error building hostVethMap list")
 	}
-	logrus.Debugf("vethsync: hostVethMap: %v", hostVethMap)
+	log.Debugf("vethsync: hostVethMap: %v", hostVethMap)
 
 	containersVethMap, err := GetContainersViewVethMapUsingID(dClient)
 	if err != nil {
 		t.Fatalf("vethsync: error building containersVethMap")
 	}
-	logrus.Debugf("vethsync: containersVethMap: %v", containersVethMap)
+	log.Debugf("vethsync: containersVethMap: %v", containersVethMap)
 
 	dangling, err := GetDanglingVeths(false, hostVethMap, containersVethMap)
 	if err != nil {
 		t.Fatalf("vethsync: error checking for dangling veths: %v", err)
 	}
-	logrus.Debugf("vethsync: dangling: %v", dangling)
+	log.Debugf("vethsync: dangling: %v", dangling)
 }

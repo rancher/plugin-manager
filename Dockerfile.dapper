@@ -22,7 +22,7 @@ RUN wget -O - ${!DOCKER_URL} > /usr/bin/docker && chmod +x /usr/bin/docker
 
 ENV DAPPER_ENV REPO TAG
 ENV DAPPER_SOURCE /go/src/github.com/rancher/plugin-manager/
-ENV DAPPER_OUTPUT ./bin ./dist
+ENV DAPPER_OUTPUT ./bin ./dist ./downloads
 ENV DAPPER_DOCKER_SOCKET true
 ENV TRASH_CACHE ${DAPPER_SOURCE}/.trash-cache
 ENV HOME ${DAPPER_SOURCE}

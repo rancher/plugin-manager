@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/containernetworking/cni/pkg/ns"
 	"github.com/docker/engine-api/client"
+	"github.com/leodotcloud/log"
 	"github.com/pkg/errors"
 	"github.com/rancher/go-rancher-metadata/metadata"
 	"github.com/rancher/plugin-manager/network"
@@ -43,11 +43,11 @@ func SyncMACAddresses(mc metadata.Client, dockerClient *client.Client) {
 }
 
 func (ms *MACSyncer) syncNTimes() {
-	logrus.Debugf("macsync: start sync %v times", N)
+	log.Debugf("macsync: start sync %v times", N)
 	for {
-		logrus.Debugf("macsync: syncing for first time")
+		log.Debugf("macsync: syncing for first time")
 		if done, err := ms.doSync(); err != nil {
-			logrus.Errorf("macsync: error syncing MAC addresses for the first tiime: %v", err)
+			log.Errorf("macsync: error syncing MAC addresses for the first tiime: %v", err)
 		} else if done {
 			break
 		}
@@ -56,9 +56,9 @@ func (ms *MACSyncer) syncNTimes() {
 
 	for i := 0; i < N; i++ {
 		time.Sleep(syncInterval)
-		logrus.Debugf("macsync: syncing i=%v time", i)
+		log.Debugf("macsync: syncing i=%v time", i)
 		if _, err := ms.doSync(); err != nil {
-			logrus.Errorf("macsync: i: %v, error syncing MAC addresses: %v", i, err)
+			log.Errorf("macsync: i: %v, error syncing MAC addresses: %v", i, err)
 		}
 	}
 }
@@ -79,16 +79,16 @@ func (ms *MACSyncer) doSync() (bool, error) {
 
 		didSomething = true
 		err := network.ForEachContainerNS(ms.dc, ms.mc, n.UUID, func(aContainer metadata.Container, _ ns.NetNS) error {
-			logrus.Debugf("macsync: aContainer: %v", aContainer)
+			log.Debugf("macsync: aContainer: %v", aContainer)
 			l, err := netlink.LinkByName("eth0")
 			if err != nil {
-				logrus.Errorf("macsync: for container: %v, could not lookup interface: %v",
+				log.Errorf("macsync: for container: %v, could not lookup interface: %v",
 					aContainer, err)
 				return err
 			}
 			foundMAC := l.Attrs().HardwareAddr.String()
 			if !strings.EqualFold(aContainer.PrimaryMacAddress, foundMAC) {
-				logrus.Infof("macsync: fixing container %v MAC address, found=%v, expected: %v",
+				log.Infof("macsync: fixing container %v MAC address, found=%v, expected: %v",
 					aContainer.ExternalId, foundMAC, aContainer.PrimaryMacAddress)
 
 				hwaddr, err := net.ParseMAC(aContainer.PrimaryMacAddress)
@@ -106,7 +106,7 @@ func (ms *MACSyncer) doSync() (bool, error) {
 			lastError = err
 		}
 	}
-	logrus.Debugf("macsync: didSomething=%v", didSomething)
+	log.Debugf("macsync: didSomething=%v", didSomething)
 
 	return didSomething, lastError
 }
