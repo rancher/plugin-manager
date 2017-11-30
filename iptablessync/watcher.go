@@ -68,6 +68,12 @@ func (iptw *IPTablesWatcher) runFirstTime() error {
 		return err
 	}
 
+	// check and hook chains
+	if err := iptw.checkAndHookChains(); err != nil {
+		log.Errorf("iptablessync: error while checkAndHookChains for first time: %v. Will retry again", err)
+		return err
+	}
+
 	return nil
 }
 
