@@ -9,7 +9,7 @@ import (
 
 // Some of the tests can run only when in development,
 // remember to disable this before commiting the code.
-const inDevelopment = true
+const inDevelopment = false
 
 func TestCmdListDNAT(t *testing.T) {
 	if !inDevelopment {
@@ -111,11 +111,17 @@ func TestGetMismatchDNATEntries(t *testing.T) {
 		t.Fail()
 	}
 	containersMap, err := buildContainersMaps(mc)
+	log.Debugf("containersMap: %+v", containersMap)
 	if err != nil {
 		log.Errorf("conntracksync: error building containersMap")
 		t.Fail()
 	}
-	mismatchEntries, err := getMismatchDNATEntries(containersMap)
+	excludedDNATSubnets, err := getExcludedSubnetsForDNAT(mc)
+	if err != nil {
+		t.Fail()
+	}
+
+	mismatchEntries, err := getMismatchDNATEntries(containersMap, excludedDNATSubnets)
 	if err != nil {
 		log.Errorf("error fetching mismatch DNAT entries")
 		t.Fail()

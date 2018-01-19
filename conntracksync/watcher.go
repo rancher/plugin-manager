@@ -60,8 +60,5 @@ func (ctw *ConntrackTableWatcher) onChangeNoError(version string) {
 }
 
 func (ctw *ConntrackTableWatcher) doSync() error {
-	if err := conntrack.SyncNATEntries(ctw.mc); err != nil {
-		return err
-	}
-	return nil
+	return conntrack.SyncNATEntries(ctw.mc)
 }
