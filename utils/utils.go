@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"net"
 	"strings"
 
 	"github.com/leodotcloud/log"
@@ -159,4 +160,31 @@ func GetLocalNetworksAndRoutersFromMetadata(mc metadata.Client) ([]metadata.Netw
 // the states that are considered running.
 func IsContainerConsideredRunning(aContainer metadata.Container) bool {
 	return (aContainer.State == "running" || aContainer.State == "starting" || aContainer.State == "stopping")
+}
+
+// IsIPInSubnet checks if the given IP address belongs to the given subnet.
+// ip without subnet mask, subnet in CIDR format
+func IsIPInSubnet(ipStr, subnetStr string) (bool, error) {
+	_, subnet, err := net.ParseCIDR(subnetStr)
+	if err != nil {
+		return false, err
+	}
+
+	ip := net.ParseIP(ipStr)
+
+	return subnet.Contains(ip), nil
+}
+
+// IsIPInSubnets checks if the given ip address is part of any of the given subnets
+func IsIPInSubnets(ip string, subnets []string) (bool, error) {
+	for _, subnet := range subnets {
+		in, err := IsIPInSubnet(ip, subnet)
+		if err != nil {
+			continue
+		}
+		if in {
+			return true, nil
+		}
+	}
+	return false, nil
 }

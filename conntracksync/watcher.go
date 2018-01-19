@@ -2,13 +2,11 @@ package conntracksync
 
 import (
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/leodotcloud/log"
 	"github.com/rancher/go-rancher-metadata/metadata"
 	"github.com/rancher/plugin-manager/conntracksync/conntrack"
-	"github.com/rancher/plugin-manager/utils"
 )
 
 var (
@@ -62,105 +60,5 @@ func (ctw *ConntrackTableWatcher) onChangeNoError(version string) {
 }
 
 func (ctw *ConntrackTableWatcher) doSync() error {
-	containersMap, err := ctw.buildContainersMaps()
-	if err != nil {
-		log.Errorf("conntracksync: error building containersMap")
-		return err
-	}
-
-	dCTEntries, err := conntrack.ListDNAT()
-	if err != nil {
-		log.Errorf("conntracksync: error fetching DNAT conntrack entries")
-		return err
-	}
-
-	for _, ctEntry := range dCTEntries {
-		var c *metadata.Container
-		var specificEntryFound, genericEntryFound bool
-		specificKey := ctEntry.OriginalDestinationIP + ":" + ctEntry.OriginalDestinationPort + "/" + ctEntry.Protocol
-		c, specificEntryFound = containersMap[specificKey]
-		if !specificEntryFound {
-			genericKey := "0.0.0.0:" + ctEntry.OriginalDestinationPort + "/" + ctEntry.Protocol
-			c, genericEntryFound = containersMap[genericKey]
-			if !genericEntryFound {
-				continue
-			}
-		}
-		if c.PrimaryIp != "" && ctEntry.ReplySourceIP != c.PrimaryIp {
-			log.Infof("conntracksync: deleting mismatching DNAT conntrack entry found: %v. [expected: %v, got: %v]", ctEntry, c.PrimaryIp, ctEntry.ReplySourceIP)
-			if err := conntrack.CTEntryDelete(ctEntry); err != nil {
-				log.Errorf("conntracksync: error deleting the conntrack entry: %v", err)
-			}
-		}
-	}
-
-	sCTEntries, err := conntrack.ListSNAT()
-	if err != nil {
-		log.Errorf("conntracksync: error fetching SNAT conntrack entries")
-		return err
-	}
-
-	for _, ctEntry := range sCTEntries {
-		var c *metadata.Container
-		var specificEntryFound, genericEntryFound bool
-		specificKey := ctEntry.ReplyDestinationIP + ":" + ctEntry.ReplyDestinationPort + "/" + ctEntry.Protocol
-		c, specificEntryFound = containersMap[specificKey]
-		if !specificEntryFound {
-			genericKey := "0.0.0.0:" + ctEntry.ReplyDestinationPort + "/" + ctEntry.Protocol
-			c, genericEntryFound = containersMap[genericKey]
-			if !genericEntryFound {
-				continue
-			}
-		}
-		if c.PrimaryIp != "" && ctEntry.OriginalSourceIP != c.PrimaryIp {
-			log.Infof("conntracksync: deleting mismatching SNAT conntrack entry found: %v. [expected: %v, got: %v]", ctEntry, c.PrimaryIp, ctEntry.OriginalSourceIP)
-			if err := conntrack.CTEntryDelete(ctEntry); err != nil {
-				log.Errorf("conntracksync: error deleting the conntrack entry: %v", err)
-			}
-		}
-	}
-
-	return nil
-}
-
-func (ctw *ConntrackTableWatcher) buildContainersMaps() (
-	map[string]*metadata.Container, error) {
-	host, err := ctw.mc.GetSelfHost()
-	if err != nil {
-		log.Errorf("conntracksync: error fetching self host from metadata")
-		return nil, err
-	}
-
-	containers, err := ctw.mc.GetContainers()
-	if err != nil {
-		log.Errorf("conntracksync: error fetching containers from metadata")
-		return nil, err
-	}
-	containersMap := make(map[string]*metadata.Container)
-	for index, aContainer := range containers {
-		if !(aContainer.HostUUID == host.UUID &&
-			utils.IsContainerConsideredRunning(aContainer) &&
-			len(aContainer.Ports) > 0) {
-			continue
-		}
-
-		for _, aPort := range aContainer.Ports {
-			protocol := "tcp"
-			splits := strings.Split(aPort, ":")
-			if len(splits) != 3 {
-				continue
-			}
-			hostIP := splits[0]
-			hostPort := splits[1]
-			targetPort := splits[2]
-			parts := strings.Split(targetPort, "/")
-			if len(parts) == 2 {
-				protocol = parts[1]
-			}
-
-			containersMap[hostIP+":"+hostPort+"/"+protocol] = &containers[index]
-		}
-	}
-
-	return containersMap, nil
+	return conntrack.SyncNATEntries(ctw.mc)
 }
