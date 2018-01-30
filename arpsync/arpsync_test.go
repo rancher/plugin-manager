@@ -16,7 +16,7 @@ func TestDoSync(t *testing.T) {
 	if !inDevelopment {
 		t.Skip("not in development mode")
 	}
-	log.SetLevelString("string")
+	log.SetLevelString("debug")
 	log.Debugf("TestDoSync")
 	mc, err := metadata.NewClientAndWait("http://169.254.169.250/2016-07-29")
 	if err != nil {
