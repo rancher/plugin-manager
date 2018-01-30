@@ -17,7 +17,7 @@ func TestGetBridgeInfoFromCNIConfig(t *testing.T) {
 	if !inDevelopment {
 		t.Skip("not in development mode")
 	}
-	log.SetLevelString("string")
+	log.SetLevelString("debug")
 	cniConf := `{"10-rancher.conf": {
   "bridge": "docker0",
   "bridgeSubnet": "10.42.0.0/16",
@@ -55,7 +55,7 @@ func TestGetContainersViewVethMapByEnteringNS(t *testing.T) {
 	if !inDevelopment {
 		t.Skip("not in development mode")
 	}
-	log.SetLevelString("string")
+	log.SetLevelString("debug")
 
 	dClient, err := client.NewEnvClient()
 	if err != nil {
@@ -73,7 +73,7 @@ func TestGetHostViewVethMap(t *testing.T) {
 	if !inDevelopment {
 		t.Skip("not in development mode")
 	}
-	log.SetLevelString("string")
+	log.SetLevelString("debug")
 
 	metadataURL := "http://169.254.169.250/2016-07-29"
 	mc, err := metadata.NewClientAndWait(metadataURL)
@@ -92,7 +92,7 @@ func TestGetContainersViewVethMapUsingID(t *testing.T) {
 	if !inDevelopment {
 		t.Skip("not in development mode")
 	}
-	log.SetLevelString("string")
+	log.SetLevelString("debug")
 
 	dClient, err := client.NewEnvClient()
 	if err != nil {
@@ -110,7 +110,7 @@ func TestGetDanglingVeths(t *testing.T) {
 	if !inDevelopment {
 		t.Skip("not in development mode")
 	}
-	log.SetLevelString("string")
+	log.SetLevelString("debug")
 
 	dClient, err := client.NewEnvClient()
 	if err != nil {

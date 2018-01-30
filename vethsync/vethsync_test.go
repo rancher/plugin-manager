@@ -36,7 +36,7 @@ func TestDoSync(t *testing.T) {
 	if !inDevelopment {
 		t.Skip("not in development mode")
 	}
-	log.SetLevelString("string")
+	log.SetLevelString("debug")
 	log.Debugf("TestDoSync")
 
 	vw, err := getTestVethWatcher()
