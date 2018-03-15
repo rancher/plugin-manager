@@ -174,7 +174,7 @@ func deleteEntries(entries []CTEntry) error {
 	hasErrored := false
 	for _, ctEntry := range entries {
 		if err := CTEntryDelete(ctEntry); err != nil {
-			log.Errorf("conntracksync: error deleting the conntrack entry: %v", err)
+			log.Errorf("conntrack: error deleting the conntrack entry: %v", err)
 			hasErrored = true
 		}
 	}
@@ -191,35 +191,36 @@ func getMismatchDNATEntries(containersMap map[string]*metadata.Container, exclud
 
 	dCTEntries, err := ListDNAT()
 	if err != nil {
-		log.Errorf("conntracksync: error fetching DNAT conntrack entries")
+		log.Errorf("conntrack: error fetching DNAT conntrack entries")
 		return mismatchEntries, err
 	}
 
 	for _, ctEntry := range dCTEntries {
+		log.Debugf("conntrack: getMismatchDNATEntries: ctEntry: %v", ctEntry)
 		in, err := pmutils.IsIPInSubnets(ctEntry.OriginalDestinationIP, excludedSubnets)
 		if err != nil {
-			log.Errorf("conntracksync: error checking if ip in excluded subnets: %v", err)
+			log.Errorf("conntrack: error checking if ip in excluded subnets: %v", err)
 		}
 		if in {
-			log.Debugf("conntracksync: ip=%v is in excludedSubnets, skipping", ctEntry.OriginalDestinationIP)
+			log.Debugf("conntrack: ip=%v is in excludedSubnets, skipping", ctEntry.OriginalDestinationIP)
 			continue
 		}
 		var c *metadata.Container
 		var specificEntryFound, genericEntryFound bool
 		specificKey := ctEntry.OriginalDestinationIP + ":" + ctEntry.OriginalDestinationPort + "/" + ctEntry.Protocol
-		log.Debugf("getMismatchDNATEntries: specificKey=%v", specificKey)
+		log.Debugf("conntrack: getMismatchDNATEntries: specificKey=%v", specificKey)
 		c, specificEntryFound = containersMap[specificKey]
 		if !specificEntryFound {
 			genericKey := "0.0.0.0:" + ctEntry.OriginalDestinationPort + "/" + ctEntry.Protocol
-			log.Debugf("getMismatchDNATEntries: genericKey=%v", genericKey)
+			log.Debugf("conntrack: getMismatchDNATEntries: genericKey=%v", genericKey)
 			c, genericEntryFound = containersMap[genericKey]
 			if !genericEntryFound {
 				continue
 			}
 		}
-		log.Debugf("getMismatchDNATEntries: c=%+v", c)
+		log.Debugf("conntrack: getMismatchDNATEntries: c=%+v", c)
 		if c.PrimaryIp != "" && ctEntry.ReplySourceIP != c.PrimaryIp {
-			log.Infof("conntracksync: found mismatching DNAT conntrack entry: %v. [expected: %v, got: %v]", ctEntry, c.PrimaryIp, ctEntry.ReplySourceIP)
+			log.Infof("conntrack: found mismatching DNAT conntrack entry: %v. [expected: %v, got: %v]", ctEntry, c.PrimaryIp, ctEntry.ReplySourceIP)
 			mismatchEntries = append(mismatchEntries, ctEntry)
 		}
 	}
@@ -243,7 +244,7 @@ func getMismatchSNATEntries(containersMap map[string]*metadata.Container) ([]CTE
 
 	sCTEntries, err := ListSNAT()
 	if err != nil {
-		log.Errorf("conntracksync: error fetching SNAT conntrack entries")
+		log.Errorf("conntrack: error fetching SNAT conntrack entries")
 		return mismatchEntries, err
 	}
 
@@ -260,7 +261,7 @@ func getMismatchSNATEntries(containersMap map[string]*metadata.Container) ([]CTE
 			}
 		}
 		if c.PrimaryIp != "" && ctEntry.OriginalSourceIP != c.PrimaryIp {
-			log.Infof("conntracksync: found mismatching SNAT conntrack entry: %v. [expected: %v, got: %v]", ctEntry, c.PrimaryIp, ctEntry.OriginalSourceIP)
+			log.Infof("conntrack: found mismatching SNAT conntrack entry: %v. [expected: %v, got: %v]", ctEntry, c.PrimaryIp, ctEntry.OriginalSourceIP)
 			mismatchEntries = append(mismatchEntries, ctEntry)
 		}
 	}
@@ -282,7 +283,7 @@ func SyncSNATEntries(containersMap map[string]*metadata.Container) error {
 func SyncNATEntries(mc metadata.Client) error {
 	containersMap, err := buildContainersMaps(mc)
 	if err != nil {
-		log.Errorf("conntracksync: error building containersMap")
+		log.Errorf("conntrack: error building containersMap")
 		return err
 	}
 
@@ -290,6 +291,7 @@ func SyncNATEntries(mc metadata.Client) error {
 	if err != nil {
 		return err
 	}
+	log.Debugf("conntrack: excludedDNATSubnets=%v", excludedDNATSubnets)
 
 	err = SyncDNATEntries(containersMap, excludedDNATSubnets)
 	if err != nil {
@@ -307,13 +309,13 @@ func SyncNATEntries(mc metadata.Client) error {
 func buildContainersMaps(mc metadata.Client) (map[string]*metadata.Container, error) {
 	host, err := mc.GetSelfHost()
 	if err != nil {
-		log.Errorf("conntracksync: error fetching self host from metadata")
+		log.Errorf("conntrack: error fetching self host from metadata")
 		return nil, err
 	}
 
 	containers, err := mc.GetContainers()
 	if err != nil {
-		log.Errorf("conntracksync: error fetching containers from metadata")
+		log.Errorf("conntrack: error fetching containers from metadata")
 		return nil, err
 	}
 	containersMap := make(map[string]*metadata.Container)
@@ -356,7 +358,7 @@ func getExcludedSubnetsForDNAT(mc metadata.Client) ([]string, error) {
 		if !(aService.Name == "kubernetes" && aService.Kind == "service") {
 			continue
 		}
-		log.Debugf("aService: %v", aService)
+		log.Debugf("conntrack: aService: %v", aService)
 		subnet := aService.Labels[serviceClusterIPRangeLabel]
 		if subnet != "" {
 			subnets = append(subnets, subnet)
