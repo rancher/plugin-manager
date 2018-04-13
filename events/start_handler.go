@@ -13,7 +13,6 @@ import (
 )
 
 const (
-	RancherNameserver  = "169.254.169.250"
 	RancherDomain      = "rancher.internal"
 	RancherDNS         = "io.rancher.container.dns"
 	RancherDNSPriority = "io.rancher.container.dns.priority"
@@ -85,6 +84,7 @@ func setupResolvConf(container *docker.Container) error {
 
 	defer input.Close()
 
+	RancherNameserver := os.Getenv("METADATA_IP")
 	var buffer bytes.Buffer
 	scanner := bufio.NewScanner(input)
 	searchSet := false
