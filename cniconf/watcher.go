@@ -10,9 +10,9 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/leodotcloud/log"
 	"github.com/rancher/cniglue"
 	"github.com/rancher/go-rancher-metadata/metadata"
+	"github.com/rancher/log"
 	"github.com/rancher/plugin-manager/events"
 	"github.com/rancher/plugin-manager/utils"
 )

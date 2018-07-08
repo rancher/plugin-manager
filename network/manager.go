@@ -13,9 +13,9 @@ import (
 	"github.com/docker/engine-api/client"
 	"github.com/docker/engine-api/types"
 	"github.com/docker/engine-api/types/container"
-	"github.com/leodotcloud/log"
 	"github.com/pkg/errors"
 	glue "github.com/rancher/cniglue"
+	"github.com/rancher/log"
 )
 
 const (

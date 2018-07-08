@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/leodotcloud/log"
+	"github.com/rancher/log"
 )
 
 func TestConditionsMetToWatch(t *testing.T) {

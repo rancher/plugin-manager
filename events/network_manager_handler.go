@@ -2,7 +2,7 @@ package events
 
 import (
 	docker "github.com/fsouza/go-dockerclient"
-	"github.com/leodotcloud/log"
+	"github.com/rancher/log"
 	"github.com/rancher/plugin-manager/network"
 )
 

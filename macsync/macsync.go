@@ -8,9 +8,9 @@ import (
 
 	"github.com/containernetworking/cni/pkg/ns"
 	"github.com/docker/engine-api/client"
-	"github.com/leodotcloud/log"
 	"github.com/pkg/errors"
 	"github.com/rancher/go-rancher-metadata/metadata"
+	"github.com/rancher/log"
 	"github.com/rancher/plugin-manager/network"
 	"github.com/rancher/plugin-manager/utils"
 	"github.com/vishvananda/netlink"
