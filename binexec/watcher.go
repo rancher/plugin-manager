@@ -12,9 +12,9 @@ import (
 
 	"github.com/docker/engine-api/client"
 	docker "github.com/fsouza/go-dockerclient"
-	"github.com/leodotcloud/log"
 	"github.com/rancher/cniglue"
 	"github.com/rancher/go-rancher-metadata/metadata"
+	"github.com/rancher/log"
 )
 
 var (

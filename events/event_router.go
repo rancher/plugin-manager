@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/fsouza/go-dockerclient"
-	log "github.com/leodotcloud/log"
+	log "github.com/rancher/log"
 )
 
 const workerTimeout = 60 * time.Second

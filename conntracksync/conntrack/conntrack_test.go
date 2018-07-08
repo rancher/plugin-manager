@@ -3,8 +3,8 @@ package conntrack
 import (
 	"testing"
 
-	"github.com/leodotcloud/log"
 	"github.com/rancher/go-rancher-metadata/metadata"
+	"github.com/rancher/log"
 )
 
 // Some of the tests can run only when in development,

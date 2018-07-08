@@ -5,10 +5,10 @@ import (
 	"os"
 
 	"github.com/docker/engine-api/client"
-	"github.com/leodotcloud/log"
-	"github.com/leodotcloud/log/server"
 	"github.com/pkg/errors"
 	"github.com/rancher/go-rancher-metadata/metadata"
+	"github.com/rancher/log"
+	"github.com/rancher/log/server"
 	"github.com/rancher/plugin-manager/arpsync"
 	"github.com/rancher/plugin-manager/binexec"
 	"github.com/rancher/plugin-manager/cniconf"

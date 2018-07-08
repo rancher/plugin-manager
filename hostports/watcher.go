@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/leodotcloud/log"
 	"github.com/rancher/go-rancher-metadata/metadata"
+	"github.com/rancher/log"
 	"github.com/rancher/plugin-manager/utils"
 )
 

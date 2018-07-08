@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	"github.com/fsouza/go-dockerclient"
-	log "github.com/leodotcloud/log"
 	"github.com/rancher/event-subscriber/locks"
+	log "github.com/rancher/log"
 )
 
 const (

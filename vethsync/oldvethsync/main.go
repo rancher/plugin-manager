@@ -4,8 +4,8 @@ import (
 	"os"
 
 	"github.com/docker/engine-api/client"
-	"github.com/leodotcloud/log"
 	"github.com/rancher/go-rancher-metadata/metadata"
+	"github.com/rancher/log"
 	"github.com/rancher/plugin-manager/vethsync/utils"
 	"github.com/urfave/cli"
 )
